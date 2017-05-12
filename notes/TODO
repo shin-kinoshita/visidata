@@ -1,0 +1,65 @@
+# cleanups
+- make options consistent
+- documentation
+   - emphasize diff from spreadsheet; closer to Pandas/RDBMS
+   - "keyboard" commands
+   - in example: "copy" is jarring
+   - provide another example for a command
+   - Python 'module' -> 'package'
+   - creating new sheet grammar
+   - add status() on write to journal example
+   - move from wiki to readthedocs
+- autodetect colexpr types
+- TextwrapViewer based on unicode width (as with clipdraw)
+- make all generated column names be valid identifiers
+- `mean` aggregator should be float
+- option for case-sensitive regex
+- .tsv should deal with tabs/newlines properly on ^S[ave]
+- 'new sheet'
+- add hook: extend sheet with new row
+- make alternate help command for OSes which don't send F1 to the terminal by default
+- editCell() moves down automatically; this can be a weird bug when used programmatically
+- Fix Textwrap error on .db file
+- document dev environment setup (export? virtualenv?)
+
+# features
+- regex workflow for replace/delete
+- undo/replay/save to .vd
+- unclean data notices
+- freeze column(s)
+- load larger-than-memory .tsv files
+- make sqlite db editable
+
+## requiring design
+- copy this column to different sheet
+- apply this layout to different sheet
+- make 'q' less destructive (query on exit?)
+- jump to next selected row
+- select rows with invalid values
+
+# applications
+- working vdzulip client
+  - start new topic
+  - reply to existing topic
+- other sql databases (probably separate impls instead of framework like blaze)
+- sweet interface to git
+- asteroid mining nanobots (spreadsheet game)
+- shell commands (autoparse into columns)
+
+# non-code
+- video demos
+- full API reference (can write visidata plugins/sources/apps without looking at core vd code)
+
+# release process
+- first to beta.pypi
+
+# documentation headings
+- Movement basics
+- q/ESC/Help
+- search/filter
+- save
+- column manipulation
+- statistical analysis
+- sheet manipulation
+  - working w/ multiple sheets (joins)
+
