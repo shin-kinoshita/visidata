@@ -16,26 +16,71 @@
 - option for case-sensitive regex
 - .tsv should deal with tabs/newlines properly on ^S[ave]
 - 'new sheet'
-- add hook: extend sheet with new row
-- make alternate help command for OSes which don't send F1 to the terminal by default
+- add hook: extend sheet with new row (key command)
+- make alternate help command for OSes which don't send F1 to the terminal by default (maybe 'z?' or ALT-H--make <ESC> be a special pseudo-prefix?)
 - editCell() moves down automatically; this can be a weird bug when used programmatically
 - Fix Textwrap error on .db file
 - document dev environment setup (export? virtualenv?)
 
+## Bugs
+- hide column, edit value in column after it, note that default value is from earlier column, and edited value stored in wrong place!
+- gd with cursor on the only selected row, does not delete row
+- rows with CalcErrorStr should sort
+- fix 'gn/gp' to not error 'no columns'
+- date_time in .zip should be @ date type
+bug: column order on Columns sheet does NOT affect column order on real sheet.
+
+
 # features
+- add implicit/hidden row number, to make all rows unique and to be able to sort by 'original' ordering
 - regex workflow for replace/delete
 - undo/replay/save to .vd
+   - editlog always starts replaying with no selected rows
+   - 'a' on editlog sheet applies one row at a time to sheets[1]?
 - unclean data notices
 - freeze column(s)
 - load larger-than-memory .tsv files
 - make sqlite db editable
+- set window title to current sheet?  append progress % ?
+- select rows via python expr
+- ability to select rows based on literal value (including type; not just simple string regex)
+- load filter (relatively easy support for larger-than-memory data sources)
+- select to beginning/end of rows
+- concatenate sheets: append by rows
+- 'describe' sheet provides stats for each column; values are cached until reload
+- editline: Tab/S-Tab completion
+   - more generic actions to "copy from sheet" and "paste into input line".
+- non-string columns should be freq analyzed into continuous bins
+- action to make a new sheet with unique keys as the new columns
+- notice of key column on column screen
+- replace current column with multiple from regex groups!
+- delete regex groups entirely
+- melt, unmelt 
+- call 'file' on current file, show on status
+- auto-sort ([key] columns in order)
+- determine columns by max(len(r) for r in rows)
+
 
 ## requiring design
 - copy this column to different sheet
 - apply this layout to different sheet
 - make 'q' less destructive (query on exit?)
+   - pause before reloading over edited file
 - jump to next selected row
 - select rows with invalid values
+- collapse rows by column; other columns are aggregated.  collapse is a toggle.
+- save option preferences to be autoloaded next time
+- .py not auto-executed?
+- able to scroll left/right on super-wide-column (wider than screen) textviewer
+- 'P'inned sheets added with '.' and all saved with g^S, and asked on exit if modified
+
+## user interface
+- some key to map next key to jump to this sheet.  e.g. Y F8 sets F8 to come back here
+- make A/B/C default names usable from the get go (make column.name), but don't save them
+- convert money strings to floats, stripping currency token.  create currency type?
+- vd *.json -> sheet listing files?
+- reserve backspace for undo (delete last row of editlog and replay)
+
 
 # applications
 - working vdzulip client
@@ -45,9 +90,22 @@
 - sweet interface to git
 - asteroid mining nanobots (spreadsheet game)
 - shell commands (autoparse into columns)
+   - exec process (like `top`), split output, autoreload
+   - allow TextSheet contents as source
+- pcap parser
+- binary file parser (neat interface for e.g. reverse engineering protocols)
+
+## plugins
+- codebook as you go (document all sheets/columns)
+  - add helpstr field to columns?
+- open_/save_hdf5
+- loader for OData (odata.org) interface with ODataPy
+- .csvs: multiple .csv files in one, separated by extra newlines
+- other .json tabular formats
 
 # non-code
 - video demos
+   - every step of demo, actions should report status
 - full API reference (can write visidata plugins/sources/apps without looking at core vd code)
 
 # release process
@@ -62,4 +120,7 @@
 - statistical analysis
 - sheet manipulation
   - working w/ multiple sheets (joins)
-
+- new toplevel concept names
+  - reload: clear sheet and load from raw source into .rows
+  - apply [editlog]: appky a description of changes to the data: adding a column, filter by rows, sorting by column
+  - replay: reload and apply editlog

@@ -1,0 +1,60 @@
+--- 2016-Oct-25 Tuesday 11:42pm --  plan
+
+ideally works with stock Python3, but willing to negotiate numpy if used for interop with adapters.
+Probably no other external modules.
+
+1) basic python3 curses display of .csv input 
+   *a) with cursor movement, search, and pagination
+   b) row/column hiding/*reordering
+   *c) multiple sheets, sheet list with sheet stats to manage (and join for 1e/f)
+   *d) S.columns metasheet, with column stats;
+   *e) filter/search by regex in column
+   *f) 'g'lobal prefix
+
+   g) row append all marked sheets into first marked sheet by column name
+   h) column append by row key (join: inner/outer/cross/diff)
+   *i) mark/hide/delete rows (bulk ops)
+   *j) new column from expression with r.other_column
+   k) aggregation (group by current column)
+   *l) manually edit cell (log to editlog)
+   m) bulk transform (diffs to editlog)
+   *n) re-type column
+   *o) reload sheet as different type
+
+2) inputs
+   a) .csv
+      - 30GB (background build index and cache on fs): foundation for offline data
+      - user-specified options for csv
+   b) bigquery (asynchronous updates): foundation for latency
+  *c) json (hashes)
+   d) sqlalchemy
+  *e) hdf5
+  *f) xlsx
+   g) accessdb
+   h) html
+   i) url download
+
+
+3) transforms
+   a) allow numpy/pandas functions for 1h/1i
+   b) regex
+
+4) output (save to file: full, marked/visible, screen)
+   a) hdf5
+   b) .csv
+   c) sql (including sheet queries)
+
+5) other sheets/features
+   *a) F builds frequency table for current column (and also F from 1c)
+   *b) dir/.zip file list (<enter> loads file)
+    c) *settings sheet, save to rc
+
+6) documentation
+   a) howto add new input
+   b) howto add new commands
+
+7) settings
+   - csv
+   - cosmetic strings
+   - custom commands
+
