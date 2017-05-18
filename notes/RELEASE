@@ -1,0 +1,13 @@
+# Release checklist
+
+1. Add version and release date to CHANGELOG with bullet points of major changes.
+
+2. Bump version at top of README.md, in __version__ in visidata/vd.py, and in setup.py.
+
+3. Merge to master and create a tag 'v#.##' for that commit.
+
+4. Push to testpypi and then pypi.
+
+        python setup.py sdist upload -r testpypi
+
+

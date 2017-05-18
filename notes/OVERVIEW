@@ -1,0 +1,50 @@
+
+VisiData applies the design aesthetic of VisiCalc to modern terminals for analyzing Big[ger] Data.
+
+A fundamental design difference, though, is that VisiData organizes the spreadsheet into
+rows of objects, with programmable columns that interact with those rows; while
+VisiCalc allows any cell to have an independent formula.[1]
+
+This constrains the input to strictly columnar data, but it also allows
+for great optimization of workflow.[2]
+
+With only a few keystrokes, the data can be sliced and recombined in natural
+and powerful ways.
+
+In addition, the source data, transformations, and manual edits can be automatically logged,
+and prepared data can be saved in formats that import directly into other
+visualization and analysis tools.
+
+Most data sources are already accessible easily installable Python modules.
+VisiData is a snappy and universal interface for the most common actions: search, filter, join, transform, melt, etc
+
+The VisiData core provides a framework for a common user interface. It can be extended with:
+   - new commands and keybindings;  (user customization)
+   - loaders and savers for other formats;  (data vendor customization)
+   - custom sheets and transforms  (app customization)
+
+---
+
+[1]They did it for very good reasons; at the time, both the screen size and memory size were so limited that every cell was precious.
+But the pattern stuck, with Lotus 1-2-3 and Quattro and to this day Excel and Google Sheets all giving individual cells design priority over rows and columns.
+
+Of course you can do the same general operations with either approach, and the difference is not *that* much: a selection here, a submenu and modal dialog there, they're just slight inconveniences...but they create a cognitive load when multiplied by a thousand times, to the point
+that it becomes a chore, your wrist starts to hurt, you start taking shortcuts and being less diligent...and we all know how that turned out for the Germans.
+
+[2]The first order of business should usually be properly standardizing and columnizing the data anyway.
+
+[3]SheetObject is a sheet of public attributes of any Python object.
+Try it with ^O: ^Ocurses (to explore the module) or ^O2+2 to see what 4
+actually looks like inside Python.
+
+Thanks to Python's reflective nature, we can easily explore Python objects
+themselves.[3]
+
+And thanks to Python's extensive standard library (and the other powerful data
+computation libraries available for Python), we can get much of the same
+functionality available in the Python REPL, but with a tighter interface.
+
+Taking this design to its logical conclusion, it's natural to configure the
+Options and Columns layout via the same sheet interface.  And the Sheets sheet
+is used to manage, arrange, and join sheets.
+

@@ -1,0 +1,23 @@
+# How To
+
+## Customize options
+
+### For this session
+
+`O`ptions
+
+Find option row that you want to change (`/` or `g/` etc).
+
+`e`dit the value
+
+Notice the row is marked in a different color to indicated that it has been modified.
+
+Changes should take place immediately.
+
+### For all sessions
+
+Set the `O`ptions how you like them.
+
+`^S`ave that page to `~/.vdrc`
+
+

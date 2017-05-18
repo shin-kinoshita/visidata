@@ -1,0 +1,96 @@
+
+VisiData applies the design aesthetic of VisiCalc to clean and arrange data.
+
+A fundamental design difference is that VisiCalc allows any cell to
+have an independent formula, whereas VisiData organizes the spreadsheet into
+rows of objects, with programmable columns that interact with those rows.[1]
+
+This constrains the input to strictly columnar data, but it also allows major
+simplifications of the interface.  With only one or two keystrokes, the data
+can be sliced and recombined in natural and powerful ways.
+
+
+2011]  sheet.rows is a mutable list of opaque row objects.  A row can be any type of python object.
+
+2011]  sheet.columns is a list of Column, which have lambda functions to get and/or set the appropriate field of row object.
+
+2016-10]  sheet.columns is strictly in the order displayed.  Moving columns with e.g. H/L reorders this list.
+
+2016-10]  Encourage Column.name to be a valid Python identifier (e.g. not contain any spaces or punctuation besides '_').  It's not required, but any columns which don't may not work well with many features of VisiData.
+
+2016-11]  sheet.nKeys columns are 'key' columns, which are visually pinned to the left and used to identify rows for joins.
+
+2016-11-25]  selectedRows should be a set, not a list.  The ordering of the selectedRows is not the order they were added, but the current order in the actual rowset.  If the relative ordering of the selectedRows within the rowset changes, then so does any iteration of selectedRows.  I had a confusing moment in a sheet join where the order mattered.
+
+2016-11-26]  Column.type can be str/int/float/date.  'None' and 'Error' cells translate into T() for features like 'sort' that just need it to work.
+
+2016-11-26]  All options are global but individual sheets can override the global defaults.
+
+2016-11-27]  Both getstr and textpad.edit() are insufficient: getstr can't exit without accepting a value (no ESC), and textpad can't deal with spaces.  Custom editText now supports starting value and readline edit chars also.
+
+2016-11-29]  Hide columns with '-' which sets Column.width = 0.  Much easier than making derived columns from deleted columns.  Can still delete columns by going to the 'C'olumns sheet and 'd'eleting the row.  Q: need to do anything special with hidden key columns?
+
+2016-11-30]  Main col index is cursorVisibleColIndex into Sheet.visibleCols; cursorColIndex is now a derived property.  Makes navigation easier.  semantics of leftColIndex changed similarly to leftVisibleColIndex.
+
+2016-11-30]  Assign generic column headers at instantiation instead of at display time.  Makes concrete association with source columns and columns can be used in expressions without being otherwise named.  More like a spreadsheet.  Q: how to know whether or not to save column names?(don't save colnames by default if generic column names were assigned).
+
+2016-12-02]  On the 'C'olumns sheet, '-' and '!' are overridden to operate on the source sheet's rows, instead of the Columns sheet's columns.
+
+2016-12-09]  VisiData should never lose work or corrupt data.
+  - should never quit unexpectedly (only in response to 'q' or ^E')
+  - should never become unresponsive and unable to save/quit
+  - must be a "big break" keystroke that interrupts the current display
+  - ideally draw is async
+
+2016-12-22]  Commands are a list of rows from ~/.vd-commands.tsv (user) and a system .tsv of the same.
+These are stored separately internally, and every sheet instance scans both for relevant commands to make its .commands, which is used as the rows of the help sheet.  Edits on the help sheet are appended to user_commands and trigger a reload.
+
+    - base_commands is a readonly sheet that contains the visidata elements defined by the package.  some are sheet-specific.
+    - user_commands contains all user-specified overrides.  Any changes to base_commands are actually additions to user_commands.
+    - F1 pushes CommandsSheet with user_commands + sheet-specific-commands + base_commands, in that order.  sheet-specific can be from either user or base, but of course user overrides sheet and sheet overrides other ones from base.  non-matching sheet_regexes and overridden commands are filtered out.
+    - Only the most recent entry is executed (with warning) if multiple matches by sheet regex and keystrokes.
+    - gF1 pushes all_commands, which is an append of user_commands and base_commands.  Edits there are reflected back to user_commands.
+    - any changes to these should be saved to ~/.vd-commands.tsv (but with prompt) with ^S or on sheet quit if options.autosave
+
+2016-12-22] Sheet.reload[_rows]() is called when sheet is first pushed (.rows is empty), and then not again except manually.
+
+2017-01-01] VisiData options loading:
+   - one sheet is auto-loaded, containing a list of sheets to auto-load, along with their column specs, etc
+   - this sheet is hardcoded as ~/.visidata.[csv|tsv|?]
+   - 'options' object in Python tries to find sheet named 'options' first; if not specified there, then uses the base defaults.
+   - include a convenient join of the base options sheet and the user options sheet.
+   - changes to this join could be ^Saved back to the autoloaded files.
+      - add a mechanism for adding a row to the user sheet instead of actually editing the base default.
+
+2017-01-04] options revisited
+   - base_options is const OrderedDict with values including help strings, specified in visidata module with defaults
+   - user_options tsv ('option value') autoloaded, can be disabled by deleting all/relevant rows from user_options sheet
+   - how to get base_options and user_options as dict?
+   - main 'O'ptions sheet has 'option value -user -default help' columns
+   - option value is from sheet.options, then user_options, then base_options
+   - changes to base_options are added rows to user_options, which can be pushed as a sheet and saved out to user_options tsv file
+
+2017-01-04] structure solved!  i think
+   - core visidata module is a 1000-line curses tabular browser platform in one file with no dependencies other than Python3.4.
+   - can be run standalone: batteries included are .tsv browsing/editing/saving, directory browsing, and text file viewing.
+   - types are core
+   - can use .py files as plugins
+   - other formats (csv, zip, blaze, gsheets, hdf5, xlsx) are all plugins
+   - json goes along with python object browsers
+   - sheets sheet goes along with join/append
+   - plugins can be whole apps; the interface to write plugins should be well-defined, so it can be repurposed for many different workflows
+
+2017-01-07] No sheet options.  Solve filetype/headerlines/encoding with editlog/sourcelog.
+
+2017-01-07] ENTER's semantics are to dive into a row.
+
+2018-01-20] All actions on Columns metasheet refer to the source sheet.
+
+2018-01-20] Sheets stack should be more durable.
+Subsheets should be able to be quickly discarded (and their memory reclaimed).
+Source sheets (or sheets which took a long time to construct) should be more durable.
+Subsheets usually replace their source sheet.
+There is a command (backtick?) to push the source sheet of the current sheet.
+There is a command to 'freeze' the current sheet, which records the source and editlog trail required to reconstruct, and replaces the current sheet with a new sheet with all the computed values.
+
+2018-01-25] Add load-time filters to conserve memory in large datasets, when only a known subpopulation is of interest.

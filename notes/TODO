@@ -6,9 +6,9 @@
    - in example: "copy" is jarring
    - provide another example for a command
    - Python 'module' -> 'package'
-   - creating new sheet grammar
+   * creating new sheet grammar
    - add status() on write to journal example
-   - move from wiki to readthedocs
+   * move from wiki to readthedocs
 - autodetect colexpr types
 - TextwrapViewer based on unicode width (as with clipdraw)
 - make all generated column names be valid identifiers
@@ -103,24 +103,60 @@ bug: column order on Columns sheet does NOT affect column order on real sheet.
 - .csvs: multiple .csv files in one, separated by extra newlines
 - other .json tabular formats
 
-# non-code
-- video demos
-   - every step of demo, actions should report status
-- full API reference (can write visidata plugins/sources/apps without looking at core vd code)
+### REAL TODO
 
-# release process
-- first to beta.pypi
+# 1. Quickstart
+-   setup/installation
+-   running
+-   movement/quitting/help
+-   ESC out of any input line
 
-# documentation headings
-- Movement basics
-- q/ESC/Help
-- search/filter
-- save
-- column manipulation
-- statistical analysis
-- sheet manipulation
-  - working w/ multiple sheets (joins)
+# 2. Usage Guide
 - new toplevel concept names
   - reload: clear sheet and load from raw source into .rows
   - apply [editlog]: appky a description of changes to the data: adding a column, filter by rows, sorting by column
   - replay: reload and apply editlog
+
+(getting your feet wet in toplevel concepts)
+- search/filter
+- column manipulation
+- save
+- statistical analysis
+- sheet manipulation
+  - working w/ multiple sheets (joins)
+
+# 3. Dev Guide
+(as started already--creating new plugins/loaders/commands)
+
+## Advanced Dev Guide (visidata insides)
+### release process
+- first to beta.pypi
+
+# 4. Reference Guide
+- full API reference (can write visidata plugins/sources/apps without looking at core vd code)
+
+# 5. video demos
+- every step of demo, actions should report status
+
+
+---
+
+Pre-RC:
+   organize these notes, find all from laptop and other places
+   incorporate/revise ROADMAP
+
+# 0. centralize documentation
+  - move from wiki to readthedocs
+  - cleanup README.md
+  - send to Nasreen
+# 'ship' beta version that is more up-to-date and usable
+
+# Host Beginning User Workshop
+   - put together Quickstart Guide
+      - also prelim usage guide outline
+   - bring your own raw datasets
+   - small data projects, let me try to help you
+   - ask for examples that can turn into screencasts
+      - start thinking about hosting a screencast workshop
+
+

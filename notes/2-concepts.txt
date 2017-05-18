@@ -1,0 +1,59 @@
+# Concepts of VisiData
+
+- Commands and Command History
+   - basic movement
+   - the 'g' prefix
+   - in general, shift-letter pushes a sheet, ctrl-letter performs some state-modifying action, g-something supersizes it
+       - but ghjkl are special (shift and ctrl do something else)
+   - shift-number-row ~!@#$% sets type of column (note different on 'C'olumns sheet)
+   - commands are generally mnemonic in some way
+- Options and saving user settings
+- Left and Right Status Lines
+   - Left Status History
+   - Input Line/History
+
+- editing cells
+
+## Sheets, Rows, and Columns, and the Cursor
+
+- 'S'heet stack (sheets sheet)
+
+- 'C'olumns sheet
+   - Column Types: int/float/str/date/anytype
+   - Key Columns
+   - selecting/sorting/searching rows
+   - movement through sheets (TAB, BTAB, ^^, `)
+   - copying sheets, the sheet stack, diving into sources, another 'S' for the full list of sheets
+
+
+- Metasheets
+   - 'T'asks sheet
+   - 'E'rrors sheet
+   - 'I'nclude Filters sheet
+   - 'X' last inputs sheet
+   - 'V'iew current cell
+
+- Builtin Analysis
+   - 'F'requency Analysis, histogram, aggregated columns
+
+- Asynchronous Tasks
+   ^C
+
+## programmer's guide
+   - making a new sheet loader
+   - using sheet properties
+      - cursorRow
+      - cursorCol
+   - ^Quit, ^Debug
+
+### the real goal is efficient workflow for text mode junkies
+   - if the core is solid, it can easily be transformed into:
+      - directory/file browser (like commander)
+      - rdbms browser with editing capability
+      - python debugging aid (can inspect and dive into python objects)
+      - git (or other vcs) interface
+      - wrappers for top and many other unix utilities that have columnar output
+      - fun spreadsheet games
+      - and anything else that presents discrete columnar data!
+
+

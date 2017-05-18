@@ -1,0 +1,109 @@
+# visidata demo #2 (with speaking)
+
+Toplevel demos:
+    1. Get a list of all people in my precinct
+       a. create FullName and RegAddress columns
+       b. produce instant results like people who didn't vote this election--what's the breakdown of when they last voted?when did they last vote?
+       
+    2. 
+    2. Find the obvious double-voters in WA
+    3. Find double-voters by joining WA and NV
+    4. Find 
+
+## Outline
+
+I. Intro, loading, async, 
+
+Intro at high level
+   A. Movement
+   B. editing
+
+II. Launch into dir and load async
+
+III. Column Arrangement
+   A. Hide
+   B. Columns Sheet
+   C. Join many into one column
+   D. Split column into many
+
+IV. Selection
+   A. ' ' 's' 'u'
+   B. '|' and '\' with regex
+   C. '"'
+   D. ','
+
+V. Frequency Map
+   A. sort
+   B. '=' expression
+   C. 
+
+VI. Sheet arrangement
+   A. joining
+   B. melting
+
+
+'P'
+This is a short demo of VisiData, a text-mode data browsing tool written in Python3.
+
+Here we have some voter registration data that I downloaded.
+
+The files have been renamed but the raw data has not been modified in any way.
+
+# arranging
+- load wa and nv data
+- while loading, arrange columns
+  - '-' to hide a column
+  - 'C' to go to the columns sheet
+- join address into one field on both sheets
+  - 's' to select, 'u' to unselect, ' ' to toggle
+  - '+' to join columns
+  - 'e' to edit the current cell
+
+# selecting
+
+- ',' to pick up those in SEATTLE
+   - Then '"' will push a copy of the sheet with just the selected rows.
+- '|2016' to get those who voted in 2016
+- ':' to split a column with string.split
+- split out birthyear, freq analysis
+
+# fun queries
+- split out birthdate and show freq: age distribution of voters
+    - left square bracket sorts by the current column in ascending order (right is descending)
+- split out regdate and show freq: spikes every 4 years for some reason
+- create regdate-birthdate=RegAge for NV
+   - '^C' to cancel cuz taking too long
+   - 'P' 100000 to get a 100k sample instead
+
+# selecting subsets
+
+- ',' to pickup only those who voted in the 2016 general election
+ 'g ' will toggle all rows
+   - '|' selects by regex; |2016 will select all those who voted in 2016
+
+# joining sheets
+
+- '!' to mark key column
+   - scroll to the right and the key columns are pinned to the left
+- 'S' for sheets sheet
+- '&' joins selected sheets by their key columns
+- '^S' saves results
+
+
+
+---
+
+But it's actually a platform for browsing and manipulating any kind of tabular data, including csv, xlsx, hdf5, json, and even python objects.
+By v1.0, it will be able to connect directly to SQL databases, google spreadsheets, and maybe even BigData stores like RedShift.
+But it has virtually no dependencies--only Python3.4, and the specific Python3 modules needed to read alternative data formats, like h5py or openxlsx)
+
+VisiData can do much of the exploration that iPython and Jupyter can do, like simple searches, sorts, filters, transformations, and joins.
+Most of all, it aims to make these activities fast and easy from the get-go, so you can start getting a feel for your data right from its raw form, before setting up any kind of pipeline, before even importing it into the usual data processing environment.
+And also a lot faster and easier, and with less typing and no mousing--which is important to me, since 35 years of computer use is finally taking its toll on my wrists.
+
+I've been playing with voting data recently, and I got to wondering if there are people in the US who are registered to vote in more than one state.
+
+So I downloaded some Voter Registration data.  One state lists all registered voters in a single tab-separated .txt file, and the other has its lists in .csv files by county.
+
+I put those in a directory which you can see here.  These files are unmodified from their original form.
+---
