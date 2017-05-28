@@ -1,32 +1,35 @@
-# cleanups
-- make options consistent
-- documentation
-   - emphasize diff from spreadsheet; closer to Pandas/RDBMS
-   - "keyboard" commands
-   - in example: "copy" is jarring
-   - provide another example for a command
-   - Python 'module' -> 'package'
-   * creating new sheet grammar
-   - add status() on write to journal example
-   * move from wiki to readthedocs
+# pairing things
+
+- `+` to add aggregator on column
+   - popup window with enum of possibilities
 - autodetect colexpr types
 - TextwrapViewer based on unicode width (as with clipdraw)
-- make all generated column names be valid identifiers
 - `mean` aggregator should be float
-- option for case-sensitive regex
+- fix 'gn/gp' to not error 'no columns'
+- date type should have .year .minute etc fields
+- hide column, edit value in column after it, note that default value is from earlier column, and edited value stored in wrong place!
+- freeze column(s)
+- select rows via python expr
+- select to beginning/end of rows
+- {/} jump to prev/next selected row
+- % should ignore leading or trailing currency indicators
+- set window title to current sheet?  append progress % ?
+
+
+# larger cleanups
+- show key columns on ColumnsSheet
+  - colorize rows according to lambda func
+- make all generated column names be valid identifiers
 - .tsv should deal with tabs/newlines properly on ^S[ave]
 - 'new sheet'
 - add hook: extend sheet with new row (key command)
-- make alternate help command for OSes which don't send F1 to the terminal by default (maybe 'z?' or ALT-H--make <ESC> be a special pseudo-prefix?)
-- editCell() moves down automatically; this can be a weird bug when used programmatically
 - Fix Textwrap error on .db file
-- document dev environment setup (export? virtualenv?)
+
+# likely features for v1.0
+- 'describe' sheet provides stats for each column; values are cached until reload
 
 ## Bugs
-- hide column, edit value in column after it, note that default value is from earlier column, and edited value stored in wrong place!
-- gd with cursor on the only selected row, does not delete row
 - rows with CalcErrorStr should sort
-- fix 'gn/gp' to not error 'no columns'
 - date_time in .zip should be @ date type
 bug: column order on Columns sheet does NOT affect column order on real sheet.
 
@@ -34,20 +37,18 @@ bug: column order on Columns sheet does NOT affect column order on real sheet.
 # features
 - add implicit/hidden row number, to make all rows unique and to be able to sort by 'original' ordering
 - regex workflow for replace/delete
+- split on regex
+- split on character index/position
+- remove 'invalid' values (replace with None/'')
 - undo/replay/save to .vd
    - editlog always starts replaying with no selected rows
    - 'a' on editlog sheet applies one row at a time to sheets[1]?
 - unclean data notices
-- freeze column(s)
 - load larger-than-memory .tsv files
 - make sqlite db editable
-- set window title to current sheet?  append progress % ?
-- select rows via python expr
 - ability to select rows based on literal value (including type; not just simple string regex)
 - load filter (relatively easy support for larger-than-memory data sources)
-- select to beginning/end of rows
 - concatenate sheets: append by rows
-- 'describe' sheet provides stats for each column; values are cached until reload
 - editline: Tab/S-Tab completion
    - more generic actions to "copy from sheet" and "paste into input line".
 - non-string columns should be freq analyzed into continuous bins
@@ -66,7 +67,6 @@ bug: column order on Columns sheet does NOT affect column order on real sheet.
 - apply this layout to different sheet
 - make 'q' less destructive (query on exit?)
    - pause before reloading over edited file
-- jump to next selected row
 - select rows with invalid values
 - collapse rows by column; other columns are aggregated.  collapse is a toggle.
 - save option preferences to be autoloaded next time
@@ -77,7 +77,6 @@ bug: column order on Columns sheet does NOT affect column order on real sheet.
 ## user interface
 - some key to map next key to jump to this sheet.  e.g. Y F8 sets F8 to come back here
 - make A/B/C default names usable from the get go (make column.name), but don't save them
-- convert money strings to floats, stripping currency token.  create currency type?
 - vd *.json -> sheet listing files?
 - reserve backspace for undo (delete last row of editlog and replay)
 
@@ -105,28 +104,13 @@ bug: column order on Columns sheet does NOT affect column order on real sheet.
 
 ### REAL TODO
 
-# 1. Quickstart
--   setup/installation
--   running
--   movement/quitting/help
--   ESC out of any input line
-
 # 2. Usage Guide
+- working w/ multiple sheets (joins)
 - new toplevel concept names
   - reload: clear sheet and load from raw source into .rows
   - apply [editlog]: appky a description of changes to the data: adding a column, filter by rows, sorting by column
   - replay: reload and apply editlog
 
-(getting your feet wet in toplevel concepts)
-- search/filter
-- column manipulation
-- save
-- statistical analysis
-- sheet manipulation
-  - working w/ multiple sheets (joins)
-
-# 3. Dev Guide
-(as started already--creating new plugins/loaders/commands)
 
 ## Advanced Dev Guide (visidata insides)
 ### release process
@@ -138,25 +122,4 @@ bug: column order on Columns sheet does NOT affect column order on real sheet.
 # 5. video demos
 - every step of demo, actions should report status
 
-
----
-
-Pre-RC:
-   organize these notes, find all from laptop and other places
-   incorporate/revise ROADMAP
-
-# 0. centralize documentation
-  - move from wiki to readthedocs
-  - cleanup README.md
-  - send to Nasreen
-# 'ship' beta version that is more up-to-date and usable
-
-# Host Beginning User Workshop
-   - put together Quickstart Guide
-      - also prelim usage guide outline
-   - bring your own raw datasets
-   - small data projects, let me try to help you
-   - ask for examples that can turn into screencasts
-      - start thinking about hosting a screencast workshop
-
-
+# incorporate/revise ROADMAP
