@@ -1,48 +1,39 @@
+# things discovered
+- only .py as argv does not open . as expected and gives no message
+
 # pairing things
 
-- `+` to add aggregator on column
-   - popup window with enum of possibilities
+ popup window with enum of possibilities
 - autodetect colexpr types
 - TextwrapViewer based on unicode width (as with clipdraw)
 - `mean` aggregator should be float
-- fix 'gn/gp' to not error 'no columns'
-- date type should have .year .minute etc fields
 - hide column, edit value in column after it, note that default value is from earlier column, and edited value stored in wrong place!
-- freeze column(s)
-- select rows via python expr
+- freeze individual column
+/ select rows via python expr
 - select to beginning/end of rows
-- {/} jump to prev/next selected row
-- % should ignore leading or trailing currency indicators
 - set window title to current sheet?  append progress % ?
+- help TOC
 
 
 # larger cleanups
-- show key columns on ColumnsSheet
-  - colorize rows according to lambda func
-- make all generated column names be valid identifiers
-- .tsv should deal with tabs/newlines properly on ^S[ave]
+/ make all generated column names be valid identifiers
+/ .tsv should deal with tabs/newlines properly on ^S[ave]
 - 'new sheet'
 - add hook: extend sheet with new row (key command)
 - Fix Textwrap error on .db file
 
 # likely features for v1.0
-- 'describe' sheet provides stats for each column; values are cached until reload
+/ 'describe' sheet provides stats for each column; values are cached until reload
 
 ## Bugs
 - rows with CalcErrorStr should sort
 - date_time in .zip should be @ date type
-bug: column order on Columns sheet does NOT affect column order on real sheet.
 
 
 # features
 - add implicit/hidden row number, to make all rows unique and to be able to sort by 'original' ordering
-- regex workflow for replace/delete
-- split on regex
 - split on character index/position
 - remove 'invalid' values (replace with None/'')
-- undo/replay/save to .vd
-   - editlog always starts replaying with no selected rows
-   - 'a' on editlog sheet applies one row at a time to sheets[1]?
 - unclean data notices
 - load larger-than-memory .tsv files
 - make sqlite db editable
@@ -53,9 +44,8 @@ bug: column order on Columns sheet does NOT affect column order on real sheet.
    - more generic actions to "copy from sheet" and "paste into input line".
 - non-string columns should be freq analyzed into continuous bins
 - action to make a new sheet with unique keys as the new columns
-- replace current column with multiple from regex groups!
 - delete regex groups entirely
-- melt, unmelt 
+- melt, pivot should be inverses
 - call 'file' on current file, show on status
 - auto-sort ([key] columns in order)
 - determine columns by max(len(r) for r in rows)
@@ -77,7 +67,6 @@ bug: column order on Columns sheet does NOT affect column order on real sheet.
 - some key to map next key to jump to this sheet.  e.g. Y F8 sets F8 to come back here
 - make A/B/C default names usable from the get go (make column.name), but don't save them
 - vd *.json -> sheet listing files?
-- reserve backspace for undo (delete last row of editlog and replay)
 
 
 # applications
@@ -103,22 +92,10 @@ bug: column order on Columns sheet does NOT affect column order on real sheet.
 
 ### REAL TODO
 
-# 2. Usage Guide
-- working w/ multiple sheets (joins)
-- new toplevel concept names
-  - reload: clear sheet and load from raw source into .rows
-  - apply [editlog]: appky a description of changes to the data: adding a column, filter by rows, sorting by column
-  - replay: reload and apply editlog
-
-
 ## Advanced Dev Guide (visidata insides)
-### release process
-- first to beta.pypi
-
 # 4. Reference Guide
 - full API reference (can write visidata plugins/sources/apps without looking at core vd code)
 
 # 5. video demos
 - every step of demo, actions should report status
 
-# incorporate/revise ROADMAP
