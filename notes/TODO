@@ -1,26 +1,32 @@
 # things discovered
 - only .py as argv does not open . as expected and gives no message
+- need to explain how to make external global functions available to execstr
+- help table-of-contents
 
 # pairing things
 
  popup window with enum of possibilities
 - autodetect colexpr types
-- TextwrapViewer based on unicode width (as with clipdraw)
 - `mean` aggregator should be float
-- hide column, edit value in column after it, note that default value is from earlier column, and edited value stored in wrong place!
 - freeze individual column
 / select rows via python expr
 - select to beginning/end of rows
 - set window title to current sheet?  append progress % ?
-- help TOC
-
 
 # larger cleanups
 / make all generated column names be valid identifiers
 / .tsv should deal with tabs/newlines properly on ^S[ave]
 - 'new sheet'
 - add hook: extend sheet with new row (key command)
-- Fix Textwrap error on .db file
+- sheet-specific option overrides
+- help sheet organization
+
+## colors
+- colorizer func running should be more robust (exceptions should not abort all display)
+- precedence should not be essential (default prec of e.g. 5)
+- colorizer interface SUCKS.  too many things at once.  make separate colorizers for rows, cells, and separators
+- color exceptions are expected (expections?)
+
 
 # likely features for v1.0
 / 'describe' sheet provides stats for each column; values are cached until reload
