@@ -53,7 +53,6 @@ bug: column order on Columns sheet does NOT affect column order on real sheet.
    - more generic actions to "copy from sheet" and "paste into input line".
 - non-string columns should be freq analyzed into continuous bins
 - action to make a new sheet with unique keys as the new columns
-- notice of key column on column screen
 - replace current column with multiple from regex groups!
 - delete regex groups entirely
 - melt, unmelt 
