@@ -112,7 +112,7 @@ theme('disp_column_fill', ' ', 'pad chars after column value')
 theme('disp_oddspace', '\u00b7', 'displayable character for odd whitespace')
 theme('color_status', 'bold', 'status line color')
 theme('color_edit_cell', 'normal', 'edit cell color')
-theme('disp_status_fmt', '{sheet.name}| ', 'status line prefix')
+theme('disp_status_fmt', ' {sheet.name}| ', 'status line prefix')
 theme('unicode_ambiguous_width', 1, 'width to use for unicode chars marked ambiguous')
 
 ENTER='^J'
@@ -295,9 +295,6 @@ typemap = {
     anytype: ' ',
 }
 
-windowWidth = 80
-windowHeight = 25
-
 def joinSheetnames(*sheetnames):
     'Concatenate sheet names using separator (`options.sheetname_joiner`).'
     return options.sheetname_joiner.join(str(x) for x in sheetnames)
@@ -338,14 +335,20 @@ def vd():
 def exceptionCaught(status=True):
     return vd().exceptionCaught(status)
 
-def chooseOne(choices):
-    '''Return `input` statement choices formatted with `/` as separator.
+command('T', 'status(chooseOne(("True", "False")))', '')
+def chooseOne(choices, title='choose one'):
+    'Ask user to choose one of the elements (keys if dict) in `choices` , and returns the result.'
 
-    Choices can be list/tuple or dict (if dict, its keys will be used).'''
-    if isinstance(choices, dict):
-        return choices[input('/'.join(choices.keys()) + ': ')]
-    else:
-        return input('/'.join(str(x) for x in choices) + ': ')
+    vd = VisiData()
+    vd.border = True
+    vd.push(EnumSheet(title, choices))
+    h, w = len(choices)+1, max(len(title), *(len(str(x))+3 for x in choices))
+    y, x = 0, 0
+    win = curses.newwin(h+1, w+1, y, x)
+    try:
+        vd.run(win)
+    except ReturnValue as e:
+        return e.args[0]
 
 def regex_flags():
     'Return flags to pass to regex functions from options'
@@ -374,6 +377,7 @@ class VisiData:
         self.inInput = False
         self.scr = None  # curses scr
         self.hooks = {}
+        self.border = ''
 
     def status(self, *args):
         'Add status message to be shown until next action.'
@@ -505,7 +509,7 @@ class VisiData:
         try:
             lstatus = self.leftStatus(vs)
             attr = colors[options.color_status]
-            _clipdraw(scr, windowHeight-1, 0, lstatus, attr, windowWidth)
+            _clipdraw(scr, self.windowHeight-1, 1, lstatus, attr, self.windowWidth)
         except Exception as e:
             self.exceptionCaught()
 
@@ -514,7 +518,7 @@ class VisiData:
         try:
             rstatus = self.rightStatus()
             attr = colors[options.color_status]
-            _clipdraw(scr, windowHeight-1, windowWidth-len(rstatus)-2, rstatus, attr, len(rstatus))
+            _clipdraw(scr, self.windowHeight-1, self.windowWidth-len(rstatus)-2, rstatus, attr, len(rstatus))
             curses.doupdate()
         except Exception as e:
             self.exceptionCaught()
@@ -534,10 +538,17 @@ class VisiData:
             pctLoaded = ' %2d%%' % sheet.progressPct
         return '%s %9d %s' % (self.keystrokes, sheet.nRows, pctLoaded)
 
+    @property
+    def windowHeight(self):
+        return self.scr.getmaxyx()[0] if self.scr else 25
+
+    @property
+    def windowWidth(self):
+        return self.scr.getmaxyx()[1] if self.scr else 80
+
     def run(self, scr):
         'Manage execution of keystrokes and subsequent redrawing of screen.'
-        global windowHeight, windowWidth, sheet
-        windowHeight, windowWidth = scr.getmaxyx()
+        global sheet
         scr.timeout(int(options.curses_timeout))
         curses.curs_set(0)
 
@@ -550,6 +561,10 @@ class VisiData:
                 return
 
             sheet = self.sheets[0]
+
+            scr.erase()  # clear screen before every re-draw
+            if self.border:
+                scr.border(options.disp_column_sep, options.disp_column_sep)
 
             try:
                 sheet.draw(scr)
@@ -574,7 +589,7 @@ class VisiData:
             elif keystroke == '^Q':
                 return self.lastErrors and self.lastErrors[-1]
             elif keystroke == 'KEY_RESIZE':
-                windowHeight, windowWidth = scr.getmaxyx()
+                pass
             elif keystroke == 'KEY_MOUSE':
                 try:
                     devid, x, y, z, bstate = curses.getmouse()
@@ -796,7 +811,6 @@ class Sheet:
             vdglobals = g_globals
         # handy globals for use by commands
         keystrokes, _, execstr = cmd
-        self.vd = vd()
         self.sheet = self
         locs = LazyMap(dir(self),
                 lambda k,s=self: getattr(s, k),
@@ -845,7 +859,7 @@ class Sheet:
     @property
     def nVisibleRows(self):
         'Return number of visible rows, calculable from window height.'
-        return windowHeight-2
+        return self.vd.windowHeight-2
 
     @property
     def cursorCol(self):
@@ -950,7 +964,7 @@ class Sheet:
         for r in (self.genProgress(rows) if progress else rows):
             self.selectRow(r)
         if status:
-            vd().status('selected %s%s rows' % (len(self._selectedRows)-before, ' more' if before > 0 else ''))
+            self.vd.status('selected %s%s rows' % (len(self._selectedRows)-before, ' more' if before > 0 else ''))
 
     @async
     def unselect(self, rows, status=True, progress=True):
@@ -959,7 +973,7 @@ class Sheet:
         for r in (self.genProgress(rows) if progress else rows):
             self.unselectRow(r)
         if status:
-            vd().status('unselected %s/%s rows' % (before-len(self._selectedRows), before))
+            self.vd.status('unselected %s/%s rows' % (before-len(self._selectedRows), before))
 
     def selectByIdx(self, rowIdxs):
         'Select given rows by index numbers.'
@@ -1112,7 +1126,7 @@ class Sheet:
                     continue
 
                 cur_x, cur_w = self.visibleColLayout[self.cursorVisibleColIndex]
-                if cur_x+cur_w < windowWidth:  # current columns fit entirely on screen
+                if cur_x+cur_w < self.vd.windowWidth:  # current columns fit entirely on screen
                     break
                 self.leftVisibleColIndex += 1
 
@@ -1127,14 +1141,14 @@ class Sheet:
                 col.width = col.getMaxWidth(self.visibleRows)+len(options.disp_more_left)+len(options.disp_more_right)
             width = col.width if col.width is not None else col.getMaxWidth(self.visibleRows)  # handle delayed column width-finding
             if col in self.keyCols or vcolidx >= self.leftVisibleColIndex:  # visible columns
-                self.visibleColLayout[vcolidx] = [x, min(width, windowWidth-x)]
+                self.visibleColLayout[vcolidx] = [x, min(width, self.vd.windowWidth-x)]
                 x += width+len(options.disp_column_sep)
-            if x > windowWidth-1:
+            if x > self.vd.windowWidth-1:
                 break
 
         self.rightVisibleColIndex = vcolidx
 
-    def drawColHeader(self, scr, vcolidx):
+    def drawColHeader(self, scr, y, vcolidx):
         'Compose and draw column header for given vcolidx.'
         col = self.visibleCols[vcolidx]
 
@@ -1154,15 +1168,15 @@ class Sheet:
         N = ' ' + (col.name or defaultColNames[vcolidx])  # save room at front for LeftMore
         if len(N) > colwidth-1:
             N = N[:colwidth-len(options.disp_truncator)] + options.disp_truncator
-        _clipdraw(scr, 0, x, N, hdrattr, colwidth)
-        _clipdraw(scr, 0, x+colwidth-len(T), T, hdrattr, len(T))
+        _clipdraw(scr, y, x, N, hdrattr, colwidth)
+        _clipdraw(scr, y, x+colwidth-len(T), T, hdrattr, len(T))
 
         if vcolidx == self.leftVisibleColIndex and col not in self.keyCols and self.nonKeyVisibleCols.index(col) > 0:
             A = options.disp_more_left
-            scr.addstr(0, x, A, sepattr)
+            scr.addstr(y, x, A, sepattr)
 
-        if C and x+colwidth+len(C) < windowWidth:
-            scr.addstr(0, x+colwidth, C, sepattr)
+        if C and x+colwidth+len(C) < self.vd.windowWidth:
+            scr.addstr(y, x+colwidth, C, sepattr)
 
     def isVisibleIdxKey(self, vcolidx):
         'Return boolean: is given column index a key column?'
@@ -1170,11 +1184,8 @@ class Sheet:
 
     def draw(self, scr):
         'Draw entire screen onto the `scr` curses object.'
-        global windowHeight, windowWidth
         numHeaderRows = 1
-        scr.erase()  # clear screen before every re-draw
 
-        windowHeight, windowWidth = scr.getmaxyx()
         if not self.columns:
             return
 
@@ -1184,10 +1195,12 @@ class Sheet:
             x, colwidth = colinfo
             col = self.visibleCols[vcolidx]
 
-            if x < windowWidth:  # only draw inside window
-                self.drawColHeader(scr, vcolidx)
+            if x < self.vd.windowWidth:  # only draw inside window
+                headerRow = 0
+                self.drawColHeader(scr, headerRow, vcolidx)
 
-                y = numHeaderRows
+                y = headerRow + numHeaderRows
+
                 for rowidx in range(0, self.nVisibleRows):
                     if self.topRowIndex + rowidx >= self.nRows:
                         break
@@ -1200,7 +1213,8 @@ class Sheet:
                     attr = self.colorizeCell(col, row, cellval)
                     sepattr = self.colorizeRow(row) or colors[options.color_column_sep]
 
-                    _clipdraw(scr, y, x, options.disp_column_fill + cellval, attr, colwidth)
+                    scr.chgat(y, x, attr)
+                    _clipdraw(scr, y, x+1, cellval, attr, colwidth)
 
                     annotation = ''
                     if isinstance(cellval, CalcErrorStr):
@@ -1217,13 +1231,14 @@ class Sheet:
                     if (self.keyCols and col is self.keyCols[-1]) or vcolidx == self.rightVisibleColIndex:
                         sepchars = options.disp_keycol_sep
 
-                    if x+colwidth+len(sepchars) <= windowWidth:
+                    if x+colwidth+len(sepchars) <= self.vd.windowWidth:
                        scr.addstr(y, x+colwidth, sepchars, sepattr)
 
                     y += 1
 
         if vcolidx+1 < self.nVisibleCols:
-            scr.addstr(0, windowWidth-1, options.disp_more_right, colors[options.color_column_sep])
+            scr.addstr(headerRow, self.vd.windowWidth-2, options.disp_more_right, colors[options.color_column_sep])
+
 
     def editCell(self, vcolidx=None, rowidx=None):
         '''Call `editText` on given cell after setting other parameters.
@@ -1246,7 +1261,7 @@ class Sheet:
             y = self.rowLayout.get(rowidx, 0)
             currentValue = self.cellValue(self.cursorRowIndex, col)
 
-        r = vd().editText(y, x, w, value=currentValue, fillchar=options.disp_edit_fill, truncchar=options.disp_truncator)
+        r = self.vd.editText(y, x, w, value=currentValue, fillchar=options.disp_edit_fill, truncchar=options.disp_truncator)
         if rowidx >= 0:
             r = col.type(r)  # convert input to column type
 
@@ -1524,14 +1539,12 @@ def input(prompt, type='', **kwargs):
 
 def _inputLine(prompt, **kwargs):
     'Add prompt to bottom of screen and get line of input from user.'
-    global windowHeight, windowWidth
-
     scr = vd().scr
+    h, w = vd().windowHeight, vd().windowWidth
     if scr:
-        windowHeight, windowWidth = scr.getmaxyx()
-        scr.addstr(windowHeight-1, 0, prompt)
+        scr.addstr(h-1, 0, prompt)
     vd().inInput = True
-    ret = vd().editText(windowHeight-1, len(prompt), windowWidth-len(prompt)-8, attr=colors[options.color_edit_cell], unprintablechar=options.disp_unprintable, **kwargs)
+    ret = vd().editText(h-1, len(prompt), w-len(prompt)-8, attr=colors[options.color_edit_cell], unprintablechar=options.disp_unprintable, **kwargs)
     vd().inInput = False
     return ret
 
@@ -1584,6 +1597,17 @@ def clipstr(s, dispw):
 
 ## Built-in sheets
 
+class ReturnValue(Exception):
+    pass
+
+class EnumSheet(Sheet):
+    'Displays elements and returns the one user selects with ENTER'
+    def reload(self):
+        self.rows = [(str(x), x) for x in self.source]
+        self.columns = [ColumnItem('item', 0)]
+        self.command(ENTER, 'raise ReturnValue(cursorRow[0])', 'choose this item')
+
+
 ## text viewer and dir browser
 class TextSheet(Sheet):
     'Sheet displaying a string (one line per row) or a list of strings.'
@@ -1592,7 +1616,7 @@ class TextSheet(Sheet):
     def reload(self):
         'Populate sheet via `reload` function.'
         self.rows = []
-        self.columns = [Column(self.name, str, width=windowWidth)]
+        self.columns = [Column(self.name, str, width=self.vd.windowWidth)]
         if isinstance(self.source, list):
             for x in self.source:
                 # copy so modifications don't change 'original'; also one iteration through generator
@@ -1611,7 +1635,7 @@ class TextSheet(Sheet):
 
     def addLine(self, text):
         'Handle text re-wrapping.'
-        self.rows.extend(textwrap.wrap(text, width=windowWidth-2))
+        self.rows.extend(textwrap.wrap(text, width=self.vd.windowWidth-2))
 
 
 class DirSheet(Sheet):
@@ -1765,8 +1789,6 @@ def save_tsv(vs, fn):
 
 def _clipdraw(scr, y, x, s, attr, w):
     'Draw string `s` at (y,x)-(y,x+w), clipping with ellipsis char.'
-    global windowWidth
-
     _, windowWidth = scr.getmaxyx()
     dispw = 0
     try:
