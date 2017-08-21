@@ -49,5 +49,11 @@ def main():
 if __name__ == '__main__':
     vdtui.status(__version__)
     vdtui.addGlobals(globals())
+
     main()
-    os._exit(0)  # cleanup can be expensive with large datasets
+
+    from visidata.usage_stats import saveUsageData
+    saveUsageData(vd().editlog)
+
+    # cleanup is unnecessary but can be time-consuming with large datasets
+    os._exit(0)
