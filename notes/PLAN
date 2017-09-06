@@ -5,19 +5,19 @@ Probably no other external modules.
 
 1) basic python3 curses display of .csv input 
    *a) with cursor movement, search, and pagination
-   b) row/column hiding/*reordering
+   *b) row/column hiding/reordering
    *c) multiple sheets, sheet list with sheet stats to manage (and join for 1e/f)
    *d) S.columns metasheet, with column stats;
    *e) filter/search by regex in column
    *f) 'g'lobal prefix
 
    g) row append all marked sheets into first marked sheet by column name
-   h) column append by row key (join: inner/outer/cross/diff)
+   *h) column append by row key (join: inner/outer/cross/diff)
    *i) mark/hide/delete rows (bulk ops)
    *j) new column from expression with r.other_column
-   k) aggregation (group by current column)
+   *k) aggregation (group by current column)
    *l) manually edit cell (log to editlog)
-   m) bulk transform (diffs to editlog)
+   *m) bulk transform (diffs to editlog)
    *n) re-type column
    *o) reload sheet as different type
 
@@ -37,7 +37,7 @@ Probably no other external modules.
 
 3) transforms
    a) allow numpy/pandas functions for 1h/1i
-   b) regex
+   *b) regex
 
 4) output (save to file: full, marked/visible, screen)
    a) hdf5
@@ -47,7 +47,7 @@ Probably no other external modules.
 5) other sheets/features
    *a) F builds frequency table for current column (and also F from 1c)
    *b) dir/.zip file list (<enter> loads file)
-    c) *settings sheet, save to rc
+   *c) settings sheet, save to rc
 
 6) documentation
    a) howto add new input
