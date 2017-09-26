@@ -14,7 +14,7 @@ class open_xlsx(Sheet):
     def reload(self):
         import openpyxl
         self.columns = [Column('name')]
-        self.workbook = openpyxl.load_workbook(self.source.resolve(), data_only=True, read_only=True)
+        self.workbook = openpyxl.load_workbook(self.source.resolve(), data_only=True) #, read_only=True)
         self.rows = list(self.workbook.sheetnames)
 
     def getSheet(self, sheetname):
@@ -25,7 +25,9 @@ class xlsxSheet(Sheet):
     @async
     def reload(self):
         worksheet = self.source
-        self.columns = ArrayColumns(worksheet.max_column)
+        self.columns = []
+        for i in range(worksheet.max_column):
+            self.addColumn(ColumnItem(None, i, width=8, sheet=self))
         with Progress(self, worksheet.max_row) as prog:
             for row in worksheet.iter_rows():
                 self.addRow(list(cell.value for cell in row))
@@ -56,7 +58,10 @@ class xlsSheet(Sheet):
     @async
     def reload(self):
         worksheet = self.source
-        self.columns = ArrayColumns(worksheet.ncols)
+        self.columns = []
+        for i in range(worksheet.ncols):
+            self.addColumn(ColumnItem(None, i, width=8))
+
         with Progress(self, worksheet.nrows) as prog:
             for rownum in range(worksheet.nrows):
                 self.addRow(list(worksheet.cell(rownum, colnum).value for colnum in range(worksheet.ncols)))

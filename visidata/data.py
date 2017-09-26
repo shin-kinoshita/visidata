@@ -25,10 +25,30 @@ globalCommand('zr', 'sheet.cursorRowIndex = int(input("row number: "))', 'moves 
 globalCommand('P', 'nrows=int(input("random population size: ")); vs=vd.push(copy(sheet)); vs.name+="_sample"; vs.rows=random.sample(rows, nrows)', 'opens duplicate sheet with a random population subset of # rows')
 
 globalCommand('a', 'rows.insert(cursorRowIndex+1, newRow()); cursorDown(1)', 'appends a blank row')
+globalCommand('f', 'fillNullValues(cursorCol, selectedRows or rows)', 'fills null cells in current column with previous non-null value')
+
+def fillNullValues(col, rows):
+    'Fill null cells in col with the previous non-null value'
+    lastval = None
+    nullfunc = isNullFunc()
+    n = 0
+    for r in rows:
+        val = col.getValue(r)
+        if nullfunc(val):
+            if lastval:
+                col.setValue(r, lastval)
+                n += 1
+        else:
+            lastval = val
+
+    status("filled %d values" % n)
+
 
 def updateColNames(sheet):
     for c in sheet.visibleCols:
-        c.name = "_".join(c.getDisplayValue(r) for r in sheet.selectedRows or [sheet.cursorRow])
+        if not c._name:
+            c.name = "_".join(c.getDisplayValue(r) for r in sheet.selectedRows or [sheet.cursorRow])
+
 globalCommand('z^', 'sheet.cursorCol.name = cursorDisplay', 'sets current column name to value in current cell')
 globalCommand('g^', 'updateColNames(sheet)', 'sets visible column names to values in selected rows (or current row)')
 globalCommand('gz^', 'sheet.cursorCol.name = "_".join(sheet.cursorCol.getDisplayValue(r) for r in selectedRows or [cursorRow]) ', 'sets current column name to combined values in selected rows (or current row)')
@@ -41,8 +61,8 @@ globalCommand('z=', 'status(evalexpr(input("status=", "expr"), cursorRow))', 'ev
 
 globalCommand('A', 'vd.push(newSheet(int(input("num columns for new sheet: "))))', 'opens new blank sheet with number columns')
 
-globalCommand('gKEY_F(1)', 'z?')  # vdtui generic commands sheet
-globalCommand('gz?', 'z?')  # vdtui generic commands sheet
+globalCommand('gKEY_F(1)', 'help-commands')  # vdtui generic commands sheet
+globalCommand('gz?', 'help-commands')  # vdtui generic commands sheet
 
 # in VisiData, F1/z? refer to the man page
 globalCommand('z?', 'with SuspendCurses(): os.system("man vd")', 'launches VisiData manpage')

@@ -268,8 +268,8 @@ globalCommand('`', 'vd.push(source if isinstance(source, Sheet) else None)', 'op
 globalCommand('S', 'vd.push(SheetsSheet("sheets"))', 'opens Sheets Sheet')
 globalCommand('C', 'vd.push(ColumnsSheet(sheet.name+"_columns", sheet))', 'opens Columns Sheet')
 globalCommand('O', 'vd.push(vd.optionsSheet)', 'opens Options')
-globalCommand('z?', 'vd.push(HelpSheet(name + "_commands", sheet))', 'views VisiData man page')
-globalCommand('KEY_F(1)', 'z?')
+globalCommand('help-commands', 'vd.push(HelpSheet(name + "_commands", sheet))', 'views VisiData man page')
+globalCommand(['KEY_F(1)', 'z?'], 'help-commands')
 
 
 # VisiData uses Python native int, float, str, and adds simple date, currency, and anytype.
@@ -769,7 +769,8 @@ class VisiData:
             if vs in self.sheets:
                 self.sheets.remove(vs)
                 self.sheets.insert(0, vs)
-            elif vs.rows is None:  # first time
+            elif isinstance(vs.rows, tuple):  # tuple = first time sentinel
+                vs.rows = list(vs.rows)
                 self.sheets.insert(0, vs)
                 vs.reload()
                 vs.recalc()  # set up Columns
@@ -818,7 +819,7 @@ class Sheet:
         self.name = name
         self.sources = list(sources)
 
-        self.rows = None         # list of opaque row objects
+        self.rows = tuple()      # list of opaque row objects (tuple until first reload)
         self.cursorRowIndex = 0  # absolute index of cursor into self.rows
         self.cursorVisibleColIndex = 0  # index of cursor into self.visibleCols
 
@@ -898,8 +899,6 @@ class Sheet:
         return list((None for c in columns))
 
     def addRow(self, row, index=None):
-        if self.rows is None:
-            self.rows = []
         if index is None:
             self.rows.append(row)
         else:
@@ -926,6 +925,7 @@ class Sheet:
             if c._cachedValues:
                 c._cachedValues.clear()
             c.sheet = self
+            c.name = c._name  # reset _id based on this sheet
 
     def reload(self):
         'Default reloader wraps provided `loader` function'
@@ -988,7 +988,7 @@ class Sheet:
         return self.name
 
     def evalexpr(self, expr, row):
-        return eval(expr, getGlobals(), LazyMapping(self, row))
+        return eval(expr, getGlobals(), LazyMapRow(self, row))
 
     def getCommand(self, keystrokes, default=None):
         k = keystrokes
@@ -1268,6 +1268,7 @@ class Sheet:
                 index = len(self.columns)
             col.sheet = self
             self.columns.insert(index, col)
+            col.name = col._name   # reset column name to set _id once in self.columns
 
     def toggleKeyColumn(self, colidx):
         'Toggle column at given index as key column.'
@@ -1490,12 +1491,11 @@ def isNullFunc():
 class Column:
     def __init__(self, name, type=anytype, cache=False, **kwargs):
         self.sheet = None     # owning sheet, set in Sheet.addColumn
-        self._id = None       # identifier for this column, usable in expressions
         self.name = name      # display visible name; uses setter from the get-go to fill in _id also
+        self._id = None       # identifier for this column, usable in expressions
         self.fmtstr = ''      # by default, use str()
         self.type = type      # anytype/str/int/float/date/func
         self.getter = lambda row: row
-        self.full_getter = lambda sheet,col,row: col.getter(row)
         self.setter = None    # setter(sheet,col,row,value)
         self.width = None     # == 0 if hidden, None if auto-compute next time
 
@@ -1516,11 +1516,12 @@ class Column:
 
     @property
     def name(self):
-        return self._name or self._id or ''
+        return self._name
 
     @name.setter
     def name(self, name):
-        name = name.strip()
+        if isinstance(name, str):
+            name = name.strip()
         if options.force_valid_colnames:
             name = clean_to_id(name)
         self._name = name
@@ -1579,7 +1580,7 @@ class Column:
             yield v
 
     def calcValue(self, row):
-        return self.full_getter(self.sheet, self, row)
+        return self.getter(row)
 
     def getTypedValue(self, row):
         '''Returns the properly-typed value for the given row at this column.
@@ -1771,7 +1772,7 @@ class ColumnEnum(Column):
         setattr(row, self.name, value or self.default)
 
 
-class LazyMapping:
+class LazyMapRow:
     'Calculate column values as needed.'
     def __init__(self, sheet, row):
         self.row = row
@@ -1786,13 +1787,17 @@ class LazyMapping:
             i = self._keys.index(colid)
             return self.sheet.columns[i].getTypedValue(self.row)
         except ValueError:
+            if colid in ['row', '__row__']:
+                return self.row
+            elif colid in ['sheet', '__sheet__']:
+                return self.sheet
             raise KeyError(colid)
 
 
 class ColumnExpr(Column):
-    def __init__(self, expr):
-        super().__init__(expr)
-        self.expr = expr
+    def __init__(self, name, expr=None):
+        super().__init__(name)
+        self.expr = expr or name
 
     def calcValue(self, row):
         return self.sheet.evalexpr(self.compiledExpr, row)
@@ -1903,14 +1908,20 @@ class TextSheet(Sheet):
             self.addRow((len(self.rows), text))
 
 class ColumnsSheet(Sheet):
+    class ValueColumn(Column):
+        def calcValue(self, srcCol):
+            return srcCol.getDisplayValue(self.sheet.source.cursorRow)
+        def setValue(self, srcCol, val):
+            srcCol.setValue(self.sheet.source.cursorRow, val)
+
     columns = [
-            ColumnAttr('sheet', width=0),
+#            ColumnAttr('sheet', width=0),
+            ColumnAttr('ident', '_id', width=0),
             ColumnAttr('name'),
             ColumnAttr('width', type=int),
             ColumnEnum('type', globals(), default=anytype),
             ColumnAttr('fmtstr'),
-            Column('value', full_getter=lambda self,c,r: r.getDisplayValue(self.source.cursorRow),
-                            setter=lambda s,c,r,v: r.setValue(self.source.cursorRow, v)),
+            ValueColumn('value')
     ]
     nKeys = 1
     colorizers = [
@@ -1920,6 +1931,7 @@ class ColumnsSheet(Sheet):
     commands = []
 
     def reload(self):
+        self.sheet = self
         self.rows = self.source.columns
         self.cursorRowIndex = self.source.cursorColIndex
 
@@ -1942,9 +1954,16 @@ class SheetsSheet(Sheet):
 
 class HelpSheet(Sheet):
     'Show all commands available to the source sheet.'
+
+    class HelpColumn(Column):
+        def calcValue(self, r):
+            cmd = self.sheet.source.getCommand(self.prefix+r[0], None)
+            return cmd[1] if cmd else '-'
+
     columns = [ColumnItem('keystrokes', 0),
                ColumnItem('action', 1),
-               Column('with_g_prefix', full_getter=lambda s,c,r: s.source.getCommand('g'+r[0], (None,'-'))[1]),
+               HelpColumn('with_g_prefix', prefix='g'),
+               HelpColumn('with_z_prefix', prefix='z'),
                ColumnItem('execstr', 2, width=0),
     ]
     nKeys = 1
