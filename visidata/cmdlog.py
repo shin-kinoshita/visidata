@@ -11,14 +11,18 @@ option('replay_movement', False, 'insert movements during replay')
 
 globalCommand('D', 'vd.push(vd.cmdlog)', 'open CommandLog')
 globalCommand('^D', 'saveSheet(vd.cmdlog, input("save to: ", "filename", value=fnSuffix("cmdlog-{0}.vd") or "cmdlog.vd"))', 'save CommandLog to new .vd file')
-globalCommand('^U', 'CommandLog.togglePause()', 'pause/resume replay')
-globalCommand(' ', 'CommandLog.currentReplay.advance()', 'execute next row in replaying sheet')
-globalCommand('^K', 'CommandLog.currentReplay.cancel()', 'cancel current replay')
+globalCommand('replay-toggle', 'CommandLog.togglePause()', 'pause/resume replay')
+globalCommand('replay-advance', 'CommandLog.currentReplay.advance() if CommandLog.currentReplay else status("no replay in progress")', 'execute next row in replaying sheet')
+globalCommand('replay-cancel', 'CommandLog.currentReplay.cancel() if CommandLog.currentReplay else status("no replay in progress")', 'cancel current replay')
 
 #globalCommand('KEY_BACKSPACE', 'vd.cmdlog.undo()', 'remove last action on commandlog and replay')
 
-
 globalCommand('status', 'status(input("status: ", display=False))', 'show given status message')
+globalCommand('set-option', 'options[cursorRow.name] = input("options.%s = " % cursorRow.name, display=False))', 'set option to input value') # must be from options sheet
+
+keyBinding(' ', 'replay-advance')
+keyBinding('^K', 'replay-cancel')
+keyBinding('^U', 'replay-toggle')
 
 # not necessary to log movements and scrollers
 nonLogKeys = 'KEY_DOWN KEY_UP KEY_NPAGE KEY_PPAGE kDOWN kUP j k gj gk ^F ^B r < > { } / ? n N g/ g?'.split()
@@ -68,13 +72,20 @@ def getRowIdxByKey(sheet, keyvals):
 def open_vd(p):
     return CommandLog(p.name, p)
 
+
+def isLoggableCommand(cmdname):
+    return cmdname not in nonLogKeys and not cmdname.startswith('replay')
+
 # rowdef: CommandLog
 class CommandLog(Sheet):
     'Log of commands for current session.'
     commands = [
-        Command('x', 'sheet.replayOne(cursorRow); status("replayed one row")', 'replay command in current row'),
-        Command('gx', 'sheet.replay()', 'replay contents of entire CommandLog'),
-        Command('^C', 'sheet.cursorRowIndex = sheet.nRows', 'abort replay'),
+        Command('cmdlog-replay-one', 'sheet.replayOne(cursorRow); status("replayed one row")', 'replay command in current row'),
+        Command('cmdlog-replay-all', 'sheet.replay()', 'replay contents of entire CommandLog'),
+        Command('cmdlog-replay-abort', 'sheet.cursorRowIndex = sheet.nRows', 'abort replay'),
+        keyBinding('x', 'cmdlog-replay-one'),
+        keyBinding('gx', 'cmdlog-replay-all'),
+        keyBinding('^C', 'cmdlog-replay-abort'),
     ]
     columns = [ColumnAttr(x) for x in CommandLogRow._fields]
 
@@ -112,14 +123,17 @@ class CommandLog(Sheet):
 
         status('undid "%s"' % deletedRow.keystrokes)
 
-    def beforeExecHook(self, sheet, keystrokes, args=''):
-        if sheet is self:
-            return  # don't record editlog commands
+    def addCommand(self, keystrokes, input='', sheet='', col='', row='', comment=''):
         if self.currentActiveRow:
             self.afterExecSheet(sheet, False, '')
+        self.currentActiveRow = CommandLogRow([sheet, col, row, keystrokes, input, comment])
+
+    def beforeExecHook(self, sheet, keystrokes):
+        if sheet is self:
+            return  # don't record editlog commands
         sheetname = '' if keystrokes == 'o' else sheet.name
         colname = sheet.cursorCol.name or sheet.visibleCols.index(sheet.cursorCol)
-        self.currentActiveRow = CommandLogRow([sheetname, colname, sheet.cursorRowIndex, keystrokes, args, sheet._commands[keystrokes][1]])
+        self.addCommand(keystrokes, sheet=sheetname, col=colname, row=sheet.cursorRowIndex, comment=sheet._commands[keystrokes][1])
 
     def afterExecSheet(self, sheet, escaped, err):
         'Records currentActiveRow'
@@ -131,13 +145,13 @@ class CommandLog(Sheet):
 
         if sheet is not self:  # don't record jumps to cmdlog
             # remove user-aborted commands and simple movements
-            if not escaped and self.currentActiveRow.keystrokes not in nonLogKeys:
+            if not escaped and isLoggableCommand(self.currentActiveRow.keystrokes):
                 self.addRow(self.currentActiveRow)
 
         self.currentActiveRow = None
 
     def openHook(self, vs, src):
-        self.addRow(CommandLogRow(['', '', '', 'o', src, 'open file']))
+        self.addCommand('o', input=src, comment='open file')
 
     def getSheet(self, sheetname):
         vs = self.sheetmap.get(sheetname)

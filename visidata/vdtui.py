@@ -69,6 +69,8 @@ def _registerCommand(cmddict, keystrokes, execstr, helpstr):
 def globalCommand(keystrokes, execstr, helpstr=''):
     _registerCommand(baseCommands, keystrokes, execstr, helpstr)
 
+keyBinding = Command
+
 class configbool:
     def __init__(self, v):
         if isinstance(v, str):
@@ -78,6 +80,9 @@ class configbool:
 
     def __bool__(self):
         return self.val
+
+    def __eq__(self, other):
+        return self.val == other.val
 
     def __str__(self):
         return str(self.val)
@@ -98,8 +103,7 @@ class OptionsObject:
         object.__setattr__(self, '_opts', d)
 
     def __getattr__(self, k):      # options.foo
-        name, value, default, helpstr = self._opts[k]
-        return value
+        return self.__getitem__(k)
 
     def __setattr__(self, k, v):   # options.foo = v
         self.__setitem__(k, v)
@@ -108,6 +112,10 @@ class OptionsObject:
         if k not in self._opts:
             raise Exception('no such option "%s"' % k)
         self._opts[k][1] = type(self._opts[k][1])(v)
+
+    def __getitem__(self, k):      # options[k]
+        name, value, default, helpstr = self._opts[k]
+        return value
 
 options = OptionsObject(baseOptions)
 
@@ -186,7 +194,7 @@ globalCommand('G', 'gj')
 globalCommand('KEY_HOME', 'gk')
 globalCommand('KEY_END', 'gj')
 
-globalCommand('^L', 'vd.scr.clear()', 'refreshe screen')
+globalCommand('^L', 'vd.scr.clear()', 'refresh screen')
 globalCommand('^G', 'status(statusLine)', 'show cursor position and bounds of current sheet on status line')
 globalCommand('^V', 'status(__version__)', 'show version information on status line')
 globalCommand('^P', 'vd.push(TextSheet("statusHistory", vd.statusHistory))', 'open Status History sheet')
@@ -1917,11 +1925,11 @@ class ColumnsSheet(Sheet):
     columns = [
 #            ColumnAttr('sheet', width=0),
             ColumnAttr('ident', '_id', width=0),
-            ColumnAttr('name'),
+            ColumnAttr('name', width=options.default_width),
             ColumnAttr('width', type=int),
             ColumnEnum('type', globals(), default=anytype),
             ColumnAttr('fmtstr'),
-            ValueColumn('value')
+            ValueColumn('value', width=options.default_width)
     ]
     nKeys = 1
     colorizers = [

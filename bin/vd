@@ -51,7 +51,10 @@ def main():
     # command-line overrides
     for optname, optval in vars(args).items():
         if optval is not None and optname not in ['inputs', 'play', 'batch', 'output']:
+            prev = vdtui.options[optname]
             vdtui.options[optname] = optval
+            if prev != vdtui.options[optname]:  # considering type
+                vd().cmdlog.addCommand('set-option', input=optval, sheet='options', row=optname)
 
     inputs = list(args.inputs)
 
