@@ -1,27 +1,17 @@
 
 from collections import defaultdict, Counter
-
-# layers:
-# - PixelCanvas: the actual pixels on the screen.
-#   - width/height are exactly equal to the number of pixels displayable, and can change at any time.
-#   - needs to refresh from source on resize.
-#   - no cursor
-
-# - UnitCanvas: a virtual display of arbitrary dimensions
-#   - uses units convenient to the app
-#   - allows zooming in/out
-#   - has a cursor, of arbitrary position and width/height (not restricted to current zoom)
-
-#   - 
-
-# - GraphSheet: specific application, draws to UnitCanvas (inverted Y)
-
-# - MapSheet: Units are lat/long?
-
+from visidata import *
 
 # pixels covering whole actual terminal
-#  all x/y/w/h in PixelCanvas are pixel coordinates
+#  - width/height are exactly equal to the number of pixels displayable, and can change at any time.
+#  - needs to refresh from source on resize
+#  - all x/y/w/h in PixelCanvas are pixel coordinates
+#  - override cursorPixelBounds to specify a cursor (none by default)
 class PixelCanvas(Sheet):
+    left_margin_chars = 10
+    right_margin_chars = 6
+    bottom_margin_chars = 1  # reserve bottom line for x axis
+
     columns=[Column('')]  # to eliminate errors outside of draw()
     def __init__(self, name, *sources, **kwargs):
         super().__init__(name, *sources, **kwargs)
@@ -30,13 +20,13 @@ class PixelCanvas(Sheet):
         self.setPixelDimensions()
 
     def setPixelDimensions(self):
-        self.pix_leftx = left_margin_chars*2
-        self.pix_rightx = self.pixelWidth-right_margin_chars*2
-        self.pix_topy = 0
-        self.pix_bottomy = self.pixelHeight-bottom_margin_chars*4
+        self.pixelLeft = 0 # self.left_margin_chars*2
+        self.pixelWidth = vd().windowWidth*2 # (vd().windowWidth-self.right_margin_chars)*2 - self.pixelLeft
+        self.pixelTop = 0
+        self.pixelHeight = (vd().windowHeight-1)*4 # (vd().windowHeight-2-self.bottom_margin_chars)*4 - self.pixelTop
 
     def plotpixel(self, x, y, attr):
-        self.pixels[y][x].append(attr)
+        self.pixels[round(y)][round(x)][attr] += 1
 
     def plotline(self, x1, y1, x2, y2, attr):
         'Draws onscreen segment of line from (x1, y1) to (x2, y2)'
@@ -60,9 +50,13 @@ class PixelCanvas(Sheet):
     def plotlabel(self, x, y, text, attr):
         self.strings.append((x, y, text, attr))
 
-    def withinCursor(self, x, y):
-        'No cursor on base PixelCanvas; override in subclass to provide cursor.'
-        return False
+    @property
+    def pixelBottom(self):
+        return self.pixelTop+self.pixelHeight
+
+    @property
+    def pixelRight(self):
+        return self.pixelLeft+self.pixelWidth+1
 
     @property
     def cursorPixelBounds(self):
@@ -76,54 +70,64 @@ class PixelCanvas(Sheet):
                y >= top and \
                y <= bottom
 
+    def getPixelAttr(self, x, y):
+        r = self.pixels[y].get(x, None)
+        if r is None:
+            return 0
+        else:
+            return r.most_common(1)[0][0]
+
     def draw(self, scr):
         scr.erase()
 
-        cursorBBox = self.cursorPixelBounds
+        if self.pixels:
+            cursorBBox = self.cursorPixelBounds
 
-        for char_y in range(0, self.nVisibleRows+1):
-            for char_x in range(0, vd().windowWidth):
-                block_colors = [
-                    self.pixels[char_y*4  ].get(char_x*2, None),
-                    self.pixels[char_y*4+1].get(char_x*2, None),
-                    self.pixels[char_y*4+2].get(char_x*2, None),
-                    self.pixels[char_y*4  ].get(char_x*2+1, None),
-                    self.pixels[char_y*4+1].get(char_x*2+1, None),
-                    self.pixels[char_y*4+2].get(char_x*2+1, None),
-                    self.pixels[char_y*4+3].get(char_x*2, None),
-                    self.pixels[char_y*4+3].get(char_x*2+1, None)
-                ]
-                pow2 = 1
-                braille_num = 0
-                for c in block_colors:
-                    if c:
-                        braille_num += pow2
-                    pow2 *= 2
+            for char_y in range(0, self.nVisibleRows+1):
+                for char_x in range(0, vd().windowWidth):
+                    block_attrs = [
+                        self.getPixelAttr(char_x*2  , char_y*4  ),
+                        self.getPixelAttr(char_x*2  , char_y*4+1),
+                        self.getPixelAttr(char_x*2  , char_y*4+2),
+                        self.getPixelAttr(char_x*2+1, char_y*4  ),
+                        self.getPixelAttr(char_x*2+1, char_y*4+1),
+                        self.getPixelAttr(char_x*2+1, char_y*4+2),
+                        self.getPixelAttr(char_x*2  , char_y*4+3),
+                        self.getPixelAttr(char_x*2+1, char_y*4+3),
+                    ]
 
-                if braille_num != 0:
-                    only_colors = list(c for c in block_colors if c)
-                    attr = Counter(only_colors).most_common(1)[0][0]
-                else:
-                    attr = 0
+                    pow2 = 1
+                    braille_num = 0
+                    for c in block_attrs:
+                        if c:
+                            braille_num += pow2
+                        pow2 *= 2
 
-                if self.withinBounds(char_x*2, char_y*4, cursorBBox):
-                    attr, _ = colors.update(attr, 0, options.color_current_row, 10)
+                    if braille_num != 0:
+                        attr = Counter(c for c in block_attrs if c).most_common(1)[0][0]
+                    else:
+                        attr = 0
 
-                scr.addstr(char_y, char_x, chr(0x2800+braille_num), attr)
+                    if self.withinBounds(char_x*2, char_y*4, cursorBBox):
+                        attr, _ = colors.update(attr, 0, options.color_current_row, 10)
+
+                    scr.addstr(char_y, char_x, chr(0x2800+braille_num), attr)
 
         if options.show_graph_labels:
             for pix_x, pix_y, txt, attr in self.labels:
                 clipdraw(scr, int(pix_y/4), int(pix_x/2), txt, attr, len(txt))
 
 
-
-# x and y are always in grid units
+# virtual display of arbitrary dimensions
+# - x/y/w/h are always in grid units (units convenient to the app)
+# - allows zooming in/out
+# - has a cursor, of arbitrary position and width/height (not restricted to current zoom)
 class GridCanvas(PixelCanvas):
     commands = [
-        Command('h', 'sheet.cursorGridLeft -= charGridWidth', ''),
-        Command('l', 'sheet.cursorGridLeft += charGridWidth', ''),
-        Command('j', 'sheet.cursorGridTop += charGridHeight', ''),
-        Command('k', 'sheet.cursorGridTop -= charGridHeight', ''),
+        Command('h', 'sheet.cursorGridLeft -= pixelGridWidth', ''),
+        Command('l', 'sheet.cursorGridLeft += pixelGridWidth', ''),
+        Command('j', 'sheet.cursorGridTop += pixelGridHeight', ''),
+        Command('k', 'sheet.cursorGridTop -= pixelGridHeight', ''),
 
         Command('H', 'sheet.cursorGridWidth -= 1', ''),
         Command('L', 'sheet.cursorGridWidth += 1', ''),
@@ -131,26 +135,26 @@ class GridCanvas(PixelCanvas):
         Command('K', 'sheet.cursorGridHeight -= 1', ''),
 
         Command('Z', 'zoom()', 'zoom into cursor'),
-        Command('+', 'zoom(1.1)', 'zoom in 10%'),
-        Command('-', 'zoom(0.9)', 'zoom out 10%'),
+        Command('+', 'zoom(zoomlevel*1.1)', 'zoom in 10%'),
+        Command('-', 'zoom(zoomlevel*0.9)', 'zoom out 10%'),
+        Command('0', 'zoom(1.0)', 'zoom to fit full extent'),
     ]
-    def __init__(self):
+    def __init__(self, name, *sources, **kwargs):
+        super().__init__(name, *sources, **kwargs)
+
         # bounding box of entire grid, updated when adding point/line/label or recalcBounds
         self.gridLeft, self.gridTop = None, None  # derive first bounds on first draw
         self.gridWidth, self.gridHeight = None, None
 
         # bounding box of visible grid
-        self.visibleGridLeft
-        self.visibleGridTop
-        self.visibleGridWidth
-        self.visibleGridHeight
+        self.visibleGridLeft = None
+        self.visibleGridTop = None
+        self.visibleGridWidth = None
+        self.visibleGridHeight = None
 
         # bounding box of cursor (should be contained within visible grid?)
-        self.cursorGridLeft, self.cursorTopValue = None, None
-        self.cursorGridWidth, self.cursorHeightValue = None, None
-
-        # the width/height (in grid units) of a single character 'cell' in the terminal
-        self.charGridWidth, self.charGridHeight = None, None
+        self.cursorGridLeft, self.cursorGridTop = 0, 0
+        self.cursorGridWidth, self.cursorGridHeight = None, None
 
         self.points = []  # list of (grid_x, grid_y, attr)
         self.lines = []   # list of (grid_x1, grid_y1, grid_x2, grid_y2, attr)
@@ -158,13 +162,21 @@ class GridCanvas(PixelCanvas):
 
     @property
     def pixelGridWidth(self):
-        'Width in grid units of a single character cell in the terminal'
+        'Width in grid units of a single pixel in the terminal'
         return self.visibleGridWidth/self.pixelWidth
 
     @property
     def pixelGridHeight(self):
-        'Height in grid units of a single character cell in the terminal'
+        'Height in grid units of a single pixel in the terminal'
         return self.visibleGridHeight/self.pixelHeight
+
+    @property
+    def gridRight(self):
+        return self.gridLeft + self.gridWidth
+
+    @property
+    def gridBottom(self):
+        return self.gridTop + self.gridHeight
 
     @property
     def cursorPixelBounds(self):
@@ -175,23 +187,23 @@ class GridCanvas(PixelCanvas):
         ]
 
     def checkBounds(self, x, y):
-        if self.gridLeft is None or x < self.gridLeft:     self.grifLeft = x
+        if self.gridLeft is None or x < self.gridLeft:     self.gridLeft = x
         if self.gridTop is None or y < self.gridTop:       self.gridTop = y
         if self.gridWidth is None or x > self.gridRight:   self.gridWidth = x-self.gridLeft
         if self.gridHeight is None or y > self.gridBottom: self.gridHeight = y-self.gridTop
 
     def point(self, x, y, colorname):
-        checkBounds(x, y)
-        self.points.append(x, y, colors[colorname])
+        self.checkBounds(x, y)
+        self.points.append((x, y, colors[colorname]))
 
     def line(self, x1, y1, x2, y2, colorname):
-        checkBounds(x1, y1)
-        checkBounds(x2, y2)
-        self.lines.append(x1, y1, x2, y2, colors[colorname])
+        self.checkBounds(x1, y1)
+        self.checkBounds(x2, y2)
+        self.lines.append((x1, y1, x2, y2, colors[colorname]))
 
     def label(self, x, y, text, colorname):
-        checkBounds(x, y)
-        self.labels.append(x, y, text, colors[colorname])
+        self.checkBounds(x, y)
+        self.labels.append((x, y, text, colors[colorname]))
 
     def zoom(self, amt=None):
         if amt is None:  # zoom to cursor
@@ -209,14 +221,24 @@ class GridCanvas(PixelCanvas):
 
     def scaleX(self, x):
         'returns pixel x coordinate on PixelCanvas'
-        return (x-self.visibleGridLeft)*self.pixelWidth/(self.visibleGridWidth)
+        return (x-self.visibleGridLeft)*self.pixelWidth/self.visibleGridWidth
 
     def scaleY(self, y):
         'returns pixel y coordinate on PixelCanvas'
-        return (y-self.visibleGridTop)*self.pixelHeight/(self.visibleGridHeight)
+        return (y-self.visibleGridTop)*self.pixelHeight/self.visibleGridHeight
 
     def refresh(self):
         'plots points and lines and text onto the PixelCanvas'
+        if self.visibleGridLeft is None:
+            self.visibleGridLeft = self.gridLeft
+            self.visibleGridWidth = self.gridWidth
+            self.visibleGridTop = self.gridTop
+            self.visibleGridHeight = self.gridHeight
+
+            self.cursorGridWidth = self.pixelGridWidth
+            self.cursorGridHeight = self.pixelGridHeight
+
+
         for x, y, attr in Progress(self.points):
             self.plotpixel(self.scaleX(x), self.scaleY(y), attr)
 
