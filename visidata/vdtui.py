@@ -156,6 +156,7 @@ theme('color_getter_exc', 'red bold', 'color of computation exception note')
 
 ENTER='^J'
 ESC='^['
+globalCommand('KEY_RESIZE', '')  # no-op by default
 globalCommand('q',  'vd.sheets.pop(0)', 'quit current sheet')
 
 globalCommand(['h', 'KEY_LEFT'],  'cursorRight(-1)', 'move one column left')
@@ -747,8 +748,6 @@ class VisiData:
                 pass
             elif keystroke == '^Q':
                 return self.lastErrors and '\n'.join(self.lastErrors[-1])
-            elif keystroke == 'KEY_RESIZE':
-                pass
             elif keystroke == 'KEY_MOUSE':
                 try:
                     devid, x, y, z, bstate = curses.getmouse()

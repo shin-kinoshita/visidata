@@ -1,7 +1,6 @@
 from visidata import *
 
 option('color_graph_axis', 'white', 'color for graph axis labels')
-option('show_graph_labels', True, 'show axes and legend on graph')
 
 globalCommand('m', 'vd.push(GraphSheet(sheet.name+"_graph", selectedRows or rows, keyCols and keyCols[0] or None, cursorCol))', 'graph the current column vs the first key column (or row number)')
 globalCommand('gm', 'vd.push(GraphSheet(sheet.name+"_graph", selectedRows or rows, keyCols and keyCols[0], *numericCols(nonKeyVisibleCols)))', 'graph all numeric columns vs the first key column (or row number)')
@@ -16,11 +15,6 @@ def numericCols(cols):
 
 # provides unit->pixel conversion, axis labels, legend
 class GraphSheet(GridCanvas):
-    columns=[Column('')]
-    commands=[
-        Command('^L', 'refresh()', 'redraw all pixels on canvas'),
-        Command('w', 'options.show_graph_labels = not options.show_graph_labels', 'toggle show_graph_labels')
-    ]
     def __init__(self, name, rows, xcol, *ycols, **kwargs):
         super().__init__(name, rows, **kwargs)
         self.xcol = xcol
@@ -31,24 +25,29 @@ class GraphSheet(GridCanvas):
             isNumeric(col) or error('%s type is non-numeric' % col.name)
 
     def legend(self, i, txt, colorname):
-        self.plotlabel(self.pixelRight-30, self.pixelTop+i*4, txt, colorname)
+        self.plotlabel(self.canvasRight-30, self.canvasTop+i*4, txt, colors[colorname])
+
+    def scaleY(self, grid_y):
+        'returns canvas y coordinate, with y-axis inverted'
+        canvas_y = super().scaleY(grid_y)
+        return (self.gridCanvasBottom-canvas_y)
 
     @async
     def reload(self):
         nerrors = 0
         nplotted = 0
 
-        self.points.clear()
+        self.gridpoints.clear()
 
         for i, ycol in enumerate(self.ycols):
             colorname = graphColors[i % len(graphColors)]
-#            attr = colors[colorname]
+            attr = colors[colorname]
 
             for rownum, row in enumerate(Progress(self.source)):
                 try:
                     graph_x = self.xcol.getTypedValue(row) if self.xcol else rownum
                     graph_y = ycol.getTypedValue(row)
-                    self.point(graph_x, graph_y, colorname) # TODO: invert y axis
+                    self.point(graph_x, graph_y, colorname)
                     nplotted += 1
                 except EscapeException:
                     raise
@@ -58,6 +57,8 @@ class GraphSheet(GridCanvas):
 
         status('plotted %d points (%d errors)' % (nplotted, nerrors))
 
+        self.refresh()
+
     def add_y_axis_label(self, frac):
         amt = self.visibleGridTop + frac*(self.visibleGridHeight)
         if isinstance(self.visibleGridTop, int):
@@ -66,7 +67,9 @@ class GraphSheet(GridCanvas):
             txt = '%.02f' % amt
         else:
             txt = str(frac)
-        self.label(0, (1.0-frac)*self.pixelBottom, txt, options.color_graph_axis)
+
+        # plot y-axis labels on the far left of the canvas, but within the gridCanvas height-wise
+        self.plotlabel(0, self.gridCanvasTop + (1.0-frac)*self.gridCanvasHeight, txt, colors[options.color_graph_axis])
 
     def add_x_axis_label(self, frac):
         amt = self.visibleGridLeft + frac*self.visibleGridWidth
@@ -77,15 +80,16 @@ class GraphSheet(GridCanvas):
         else:
             txt = str(amt)
 
-        self.plotlabel(self.pixelLeft+frac*self.pixelWidth, self.pixelBottom, txt, options.color_graph_axis)
+        # plot x-axis labels below the gridCanvasBottom, but within the gridCanvas width-wise
+        self.plotlabel(self.gridCanvasLeft+frac*self.gridCanvasWidth, self.gridCanvasBottom+4, txt, colors[options.color_graph_axis])
 
+    @async
     def refresh(self):
         super().refresh()
-        assert self.visibleGridHeight is not None
         self.create_labels()
 
     def create_labels(self):
-        self.labels = []
+        self.gridlabels = []
 
         # y-axis
         self.add_y_axis_label(1.00)
@@ -102,7 +106,7 @@ class GraphSheet(GridCanvas):
         self.add_x_axis_label(0.00)
 
         xname = self.xcol.name if self.xcol else 'row#'
-        self.plotlabel(0, self.pixelBottom, '%*s»' % (self.left_margin_chars-2, xname), options.color_graph_axis)
+        self.plotlabel(0, self.gridCanvasBottom+4, '%*s»' % (int(self.leftMarginPixels/2-2), xname), colors[options.color_graph_axis])
 
         for i, ycol in enumerate(self.ycols):
             colorname = graphColors[i]
