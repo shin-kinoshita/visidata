@@ -735,11 +735,31 @@ class VisiData:
             self.drawRightStatus(scr, sheet)  # visible during this getkeystroke
 
             keystroke = self.getkeystroke(scr, sheet)
+
             if keystroke:  # wait until next keystroke to clear statuses and previous keystrokes
                 if not self.prefixWaiting:
                     self.keystrokes = ''
 
                 self.statuses = []
+
+                if keystroke == 'KEY_MOUSE':
+                    try:
+                        devid, x, y, z, bstate = curses.getmouse()
+                        if bstate & curses.BUTTON_CTRL:
+                            self.keystrokes += "CTRL-"
+                            bstate &= ~curses.BUTTON_CTRL
+                        if bstate & curses.BUTTON_ALT:
+                            self.keystrokes += "ALT-"
+                            bstate &= ~curses.BUTTON_ALT
+                        if bstate & curses.BUTTON_SHIFT:
+                            self.keystrokes += "SHIFT-"
+                            bstate &= ~curses.BUTTON_SHIFT
+
+                        keystroke = curses.mouseEvents.get(bstate, str(bstate))
+                        sheet.mouseX, sheet.mouseY = x, y
+                    except curses.error:
+                        keystroke = ''
+
                 self.keystrokes += keystroke
 
             self.drawRightStatus(scr, sheet)  # visible for commands that wait for input
@@ -748,12 +768,6 @@ class VisiData:
                 pass
             elif keystroke == '^Q':
                 return self.lastErrors and '\n'.join(self.lastErrors[-1])
-            elif keystroke == 'KEY_MOUSE':
-                try:
-                    devid, x, y, z, bstate = curses.getmouse()
-                    sheet.cursorRowIndex = sheet.topRowIndex+y-1
-                except curses.error:
-                    pass
             elif self.keystrokes in sheet._commands:
                 sheet.exec_keystrokes(self.keystrokes)
                 self.prefixWaiting = False
@@ -1014,7 +1028,7 @@ class Sheet:
     def exec_keystrokes(self, keystrokes, vdglobals=None):  # handle multiple commands concatenated?
         return self.exec_command(self.getCommand(keystrokes), vdglobals)
 
-    def exec_command(self, cmd, vdglobals=None):
+    def exec_command(self, cmd, args='', vdglobals=None):
         "Execute `cmd` tuple with `vdglobals` as globals and this sheet's attributes as locals.  Returns True if user cancelled."
         escaped = False
         err = ''
@@ -2215,8 +2229,14 @@ colors = ColorMaker()
 def setupcolors(stdscr, f, *args):
     curses.raw()    # get control keys instead of signals
     curses.meta(1)  # allow "8-bit chars"
-#    curses.mousemask(curses.ALL_MOUSE_EVENTS)  # enable mouse events
-#    curses.mouseinterval(0)
+    curses.mousemask(-1) # even more than curses.ALL_MOUSE_EVENTS
+    curses.mouseinterval(50) # 50ms snappy but allows for double-click
+    curses.mouseEvents = {}
+
+    for k in dir(curses):
+        if k.startswith('BUTTON') or k == 'REPORT_MOUSE_POSITION':
+            curses.mouseEvents[getattr(curses, k)] = k
+
     return f(stdscr, *args)
 
 def wrapper(f, *args):

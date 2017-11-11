@@ -15,6 +15,18 @@ def numericCols(cols):
 
 # provides unit->pixel conversion, axis labels, legend
 class GraphSheet(GridCanvas):
+    commands = GridCanvas.commands + [
+        # swap directions of up/down
+        Command('j', 'sheet.cursorGridTop -= cursorGridHeight', ''),
+        Command('k', 'sheet.cursorGridTop += cursorGridHeight', ''),
+        Command('zj', 'sheet.cursorGridTop -= charGridHeight', ''),
+        Command('zk', 'sheet.cursorGridTop += charGridHeight', ''),
+        Command('J', 'sheet.cursorGridHeight -= cursorGridHeight', ''),
+        Command('K', 'sheet.cursorGridHeight += cursorGridHeight', ''),
+        Command('zJ', 'sheet.cursorGridHeight -= charGridHeight', ''),
+        Command('zK', 'sheet.cursorGridHeight += charGridHeight', ''),
+    ]
+
     def __init__(self, name, rows, xcol, *ycols, **kwargs):
         super().__init__(name, rows, **kwargs)
         self.xcol = xcol
@@ -31,6 +43,11 @@ class GraphSheet(GridCanvas):
         'returns canvas y coordinate, with y-axis inverted'
         canvas_y = super().scaleY(grid_y)
         return (self.gridCanvasBottom-canvas_y)
+
+    @property
+    def cursorPixelBounds(self):
+        x1, y1, x2, y2 = super().cursorPixelBounds
+        return x1, y2, x2, y1  # reverse top/bottom
 
     @async
     def reload(self):
@@ -61,9 +78,9 @@ class GraphSheet(GridCanvas):
 
     def add_y_axis_label(self, frac):
         amt = self.visibleGridTop + frac*(self.visibleGridHeight)
-        if isinstance(self.visibleGridTop, int):
+        if isinstance(self.gridTop, int):
             txt = '%d' % amt
-        elif isinstance(self.visibleGridTop, float):
+        elif isinstance(self.gridTop, float):
             txt = '%.02f' % amt
         else:
             txt = str(frac)

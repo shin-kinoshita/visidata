@@ -26,13 +26,14 @@ class PixelCanvas(Sheet):
     columns=[Column('')]  # to eliminate errors outside of draw()
     commands=[
         Command('^L', 'refresh()', 'redraw all pixels on canvas'),
-        Command('KEY_RESIZE', 'resetCanvasDimensions(); refresh()', 'redraw all pixels on canvas'),
-        Command('w', 'options.show_graph_labels = not options.show_graph_labels', 'toggle show_graph_labels')
+        Command('w', 'options.show_graph_labels = not options.show_graph_labels', 'toggle show_graph_labels'),
+        Command('KEY_RESIZE', 'refresh()', ''),
     ]
     def __init__(self, name, *sources, **kwargs):
         super().__init__(name, *sources, **kwargs)
         self.pixels = defaultdict(lambda: defaultdict(Counter)) # [y][x] = { attr: count, ... }
         self.labels = []  # (x, y, text, attr)
+        self.rows = [1]  # something for cursorRowIndex
         self.resetCanvasDimensions()
 
     def resetCanvasDimensions(self):
@@ -83,9 +84,9 @@ class PixelCanvas(Sheet):
     def withinBounds(self, x, y, bbox):
         left, top, right, bottom = bbox
         return x >= left and \
-               x <= right and \
+               x < right and \
                y >= top and \
-               y <= bottom
+               y < bottom
 
     def getPixelAttr(self, x, y):
         r = self.pixels[y].get(x, None)
@@ -125,7 +126,8 @@ class PixelCanvas(Sheet):
                     else:
                         attr = 0
 
-                    if self.withinBounds(char_x*2, char_y*4, cursorBBox):
+                    if self.withinBounds(char_x*2, char_y*4, cursorBBox) or \
+                       self.withinBounds(char_x*2+1, char_y*4+3, cursorBBox):
                         attr, _ = colors.update(attr, 0, options.color_current_row, 10)
 
                     scr.addstr(char_y, char_x, chr(0x2800+braille_num), attr)
@@ -146,20 +148,34 @@ class GridCanvas(PixelCanvas):
     bottomMarginPixels = 2*4  # reserve bottom line for x axis
 
     commands = PixelCanvas.commands + [
-        Command('h', 'sheet.cursorGridLeft -= pixelGridWidth', ''),
-        Command('l', 'sheet.cursorGridLeft += pixelGridWidth', ''),
-        Command('j', 'sheet.cursorGridTop += pixelGridHeight', ''),
-        Command('k', 'sheet.cursorGridTop -= pixelGridHeight', ''),
+        Command('h', 'sheet.cursorGridLeft -= cursorGridWidth', ''),
+        Command('l', 'sheet.cursorGridLeft += cursorGridWidth', ''),
+        Command('j', 'sheet.cursorGridTop += cursorGridHeight', ''),
+        Command('k', 'sheet.cursorGridTop -= cursorGridHeight', ''),
 
-        Command('H', 'sheet.cursorGridWidth -= 1', ''),
-        Command('L', 'sheet.cursorGridWidth += 1', ''),
-        Command('J', 'sheet.cursorGridHeight += 1', ''),
-        Command('K', 'sheet.cursorGridHeight -= 1', ''),
+        Command('zh', 'sheet.cursorGridLeft -= charGridWidth', ''),
+        Command('zl', 'sheet.cursorGridLeft += charGridWidth', ''),
+        Command('zj', 'sheet.cursorGridTop += charGridHeight', ''),
+        Command('zk', 'sheet.cursorGridTop -= charGridHeight', ''),
+
+        Command('gH', 'sheet.cursorGridWidth /= 2', ''),
+        Command('gL', 'sheet.cursorGridWidth *= 2', ''),
+        Command('gJ', 'sheet.cursorGridHeight /= 2', ''),
+        Command('gK', 'sheet.cursorGridHeight *= 2', ''),
+
+        Command('H', 'sheet.cursorGridWidth -= charGridWidth', ''),
+        Command('L', 'sheet.cursorGridWidth += charGridWidth', ''),
+        Command('J', 'sheet.cursorGridHeight += charGridHeight', ''),
+        Command('K', 'sheet.cursorGridHeight -= charGridHeight', ''),
 
         Command('Z', 'zoom()', 'zoom into cursor'),
-        Command('+', 'zoom(zoomlevel*1.1)', 'zoom in 10%'),
-        Command('-', 'zoom(zoomlevel*0.9)', 'zoom out 10%'),
-        Command('0', 'zoom(1.0)', 'zoom to fit full extent'),
+        Command('+', 'sheet.zoomlevel *= 1/1.2; resetVisibleGrid()', 'zoom in 20%'),
+        Command('-', 'sheet.zoomlevel *= 1.2; resetVisibleGrid()', 'zoom out 20%'),
+        Command('0', 'sheet.zoomlevel = 1.0; resetVisibleGrid()', 'zoom to fit full extent'),
+
+        Command('BUTTON1_PRESSED', 'sheet.cursorGridLeft, sheet.cursorGridTop = gridMouse', ''),
+        Command('BUTTON1_CLICKED', 'BUTTON1_PRESSED', ''),
+        Command('BUTTON1_RELEASED', 'setCursorSize(*gridMouse)', ''),
     ]
 
     def __init__(self, name, *sources, **kwargs):
@@ -179,6 +195,8 @@ class GridCanvas(PixelCanvas):
         self.cursorGridLeft, self.cursorGridTop = 0, 0
         self.cursorGridWidth, self.cursorGridHeight = None, None
 
+        self.zoomlevel = 1.0
+
         # bounding box of gridCanvas, in pixels
         self.gridpoints = []  # list of (grid_x, grid_y, attr)
         self.gridlines = []   # list of (grid_x1, grid_y1, grid_x2, grid_y2, attr)
@@ -192,14 +210,34 @@ class GridCanvas(PixelCanvas):
         self.gridCanvasHeight = self.canvasHeight - self.bottomMarginPixels - self.topMarginPixels
 
     @property
-    def pixelGridWidth(self):
-        'Width in grid units of a single pixel in the terminal'
-        return self.visibleGridWidth/self.gridCanvasWidth
+    def gridMouse(self):
+        gridX = self.visibleGridLeft + (self.mouseX-self.gridCanvasLeft/2)*2*self.visibleGridWidth/self.gridCanvasWidth
+        gridY = self.visibleGridTop + (self.gridCanvasBottom/4-self.mouseY-1)*4*self.visibleGridHeight/self.gridCanvasHeight
+        return gridX, gridY
+
+    def setCursorSize(self, gridX, gridY):
+        'sets width based on other side x and y'
+        if gridX > self.cursorGridLeft:
+            self.cursorGridWidth = gridX - self.cursorGridLeft
+        else:
+            self.cursorGridWidth = self.cursorGridLeft - gridX
+            self.cursorGridLeft = gridX
+
+        if gridY > self.cursorGridTop:
+            self.cursorGridHeight = gridY - self.cursorGridTop
+        else:
+            self.cursorGridHeight = self.cursorGridTop - gridY
+            self.cursorGridTop = gridY
 
     @property
-    def pixelGridHeight(self):
-        'Height in grid units of a single pixel in the terminal'
-        return self.visibleGridHeight/self.gridCanvasHeight
+    def charGridWidth(self):
+        'Width in grid units of a single char in the terminal'
+        return self.visibleGridWidth*2/self.gridCanvasWidth
+
+    @property
+    def charGridHeight(self):
+        'Height in grid units of a single char in the terminal'
+        return self.visibleGridHeight*4/self.gridCanvasHeight
 
     @property
     def gridRight(self):
@@ -258,17 +296,29 @@ class GridCanvas(PixelCanvas):
             self.visibleGridWidth *= amt
             self.visibleGridHeight *= amt
 
+    def resetVisibleGrid(self):
+        # point to zoom in closer to
+        centerx = self.cursorGridLeft + self.cursorGridWidth/2
+        centery = self.cursorGridTop + self.cursorGridHeight/2
+
+        self.visibleGridWidth = self.gridWidth*self.zoomlevel
+        self.visibleGridHeight = self.gridHeight*self.zoomlevel
+        self.visibleGridLeft = centerx - self.visibleGridWidth/2
+        self.visibleGridTop = centery - self.visibleGridHeight/2
+
+        self.refresh()
+
     def checkCursor(self):
         'scroll to make cursor visible'
         return False
 
     def scaleX(self, x):
         'returns canvas x coordinate'
-        return self.gridCanvasLeft+(x-self.visibleGridLeft)*self.gridCanvasWidth/self.visibleGridWidth
+        return round(self.gridCanvasLeft+(x-self.visibleGridLeft)*self.gridCanvasWidth/self.visibleGridWidth)
 
     def scaleY(self, y):
         'returns canvas y coordinate'
-        return self.gridCanvasTop+(y-self.visibleGridTop)*self.gridCanvasHeight/self.visibleGridHeight
+        return round(self.gridCanvasTop+(y-self.visibleGridTop)*self.gridCanvasHeight/self.visibleGridHeight)
 
     @async
     def refresh(self):
@@ -283,8 +333,10 @@ class GridCanvas(PixelCanvas):
             self.visibleGridTop = self.gridTop
             self.visibleGridHeight = self.gridHeight
 
-            self.cursorGridWidth = self.pixelGridWidth
-            self.cursorGridHeight = self.pixelGridHeight
+            self.cursorGridLeft = self.visibleGridLeft
+            self.cursorGridTop = self.visibleGridTop
+            self.cursorGridWidth = self.charGridWidth
+            self.cursorGridHeight = self.charGridHeight
 
         for x, y, attr in Progress(self.gridpoints):
             self.plotpixel(self.scaleX(x), self.scaleY(y), attr)
