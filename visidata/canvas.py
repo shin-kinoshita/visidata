@@ -68,14 +68,6 @@ class PixelCanvas(Sheet):
         self.labels.append((x, y, text, attr))
 
     @property
-    def canvasBottom(self):
-        return self.canvasTop+self.canvasHeight
-
-    @property
-    def canvasRight(self):
-        return self.canvasLeft+self.canvasWidth
-
-    @property
     def cursorPixelBounds(self):
         'Returns pixel bounds of cursor as [ left, top, right, bottom ]'
         return [ 0, 0, 0, 0 ]
@@ -89,13 +81,15 @@ class PixelCanvas(Sheet):
 
     def getPixelAttr(self, x, y):
         r = self.pixels[y].get(x, None)
-        if r is None:
+        if not r:
             return 0
         else:
             return r.most_common(1)[0][0]
 
     def draw(self, scr):
         scr.erase()
+        if self.needsRefresh:
+            self.plotAll()
 
         if self.pixels:
             cursorBBox = self.cursorPixelBounds
@@ -147,10 +141,10 @@ class GridCanvas(PixelCanvas):
     bottomMarginPixels = 2*4  # reserve bottom line for x axis
 
     commands = PixelCanvas.commands + [
-        Command('h', 'sheet.cursorGridLeft -= cursorGridWidth', ''),
-        Command('l', 'sheet.cursorGridLeft += cursorGridWidth', ''),
-        Command('j', 'sheet.cursorGridTop += cursorGridHeight', ''),
-        Command('k', 'sheet.cursorGridTop -= cursorGridHeight', ''),
+        Command('cursor-left', 'sheet.cursorGridLeft -= cursorGridWidth', ''),
+        Command('cursor-right', 'sheet.cursorGridLeft += cursorGridWidth', ''),
+        Command('cursor-down', 'sheet.cursorGridTop += cursorGridHeight', ''),
+        Command('cursor-up', 'sheet.cursorGridTop -= cursorGridHeight', ''),
 
         Command('zh', 'sheet.cursorGridLeft -= charGridWidth', ''),
         Command('zl', 'sheet.cursorGridLeft += charGridWidth', ''),
@@ -167,29 +161,26 @@ class GridCanvas(PixelCanvas):
         Command('J', 'sheet.cursorGridHeight += charGridHeight', ''),
         Command('K', 'sheet.cursorGridHeight -= charGridHeight', ''),
 
+        Command('zz', 'fixPoint(canvasGridLeft, canvasGridTop, cursorGridLeft, cursorGridTop); sheet.visibleGridWidth=cursorGridWidth; sheet.visibleGridHeight=cursorGridHeight', 'set bounds to cursor'),
+
         Command('Z', 'zoom()', 'zoom into cursor'),
-        Command('+', 'sheet.zoomlevel *= 1/1.2; setVisibleGrid()', 'zoom in 20%'),
-        Command('-', 'sheet.zoomlevel *= 1.2; setVisibleGrid()', 'zoom out 20%'),
-        Command('0', 'sheet.zoomlevel = 1.0; setVisibleGrid()', 'zoom to fit full extent'),
+        Command('+', 'setZoom(zoomlevel / 1.2); refresh()', 'zoom in 20%'),
+        Command('-', 'setZoom(zoomlevel * 1.2); refresh()', 'zoom out 20%'),
+        Command('0', 'sheet.gridWidth = 0; sheet.visibleGridWidth = 0; setZoom(1.0); refresh()', 'zoom to fit full extent'),
 
         # set cursor box with left click
-        Command('BUTTON1_PRESSED', 'sheet.cursorGridLeft, sheet.cursorGridTop = gridMouseX, gridMouseY', ''),
-        Command('BUTTON1_CLICKED', 'BUTTON1_PRESSED', ''),
-        Command('BUTTON1_RELEASED', 'setCursorSize(gridMouseX, gridMouseY)', ''),
+        Command('BUTTON1_PRESSED', 'sheet.cursorGridLeft, sheet.cursorGridTop = gridMouseX, gridMouseY; sheet.cursorGridWidth=0', 'start cursor box with left mouse button press'),
+        Command('BUTTON1_RELEASED', 'setCursorSize(gridMouseX, gridMouseY)', 'end cursor box with left mouse button release'),
 
-        # center on point with right click
-        Command('BUTTON3_CLICKED', 'fixPoint(canvasWidth/2, canvasHeight/2, gridMouseX, gridMouseY)', ''),
-
-        # zoom in/out with scroll wheel
-        Command('BUTTON4_PRESSED', 'tmp=gridMouseX,gridMouseY; setZoom(zoomlevel/1.2); fixPoint(canvasMouseX, canvasMouseY, *tmp)', ''),
-        Command('REPORT_MOUSE_POSITION', 'tmp=gridMouseX,gridMouseY; setZoom(zoomlevel*1.2); fixPoint(canvasMouseX, canvasMouseY, *tmp)', ''),
+        Command('BUTTON4_PRESSED', 'tmp=(gridMouseX,gridMouseY); setZoom(zoomlevel/1.2); fixPoint(canvasMouseX, canvasMouseY, *tmp)', 'zoom in with scroll wheel'),
+        Command('REPORT_MOUSE_POSITION', 'tmp=(gridMouseX,gridMouseY); setZoom(zoomlevel*1.2); fixPoint(canvasMouseX, canvasMouseY, *tmp)', 'zoom out with scroll wheel'),
     ]
 
     def __init__(self, name, *sources, **kwargs):
         super().__init__(name, *sources, **kwargs)
 
         # bounding box of entire grid in grid units, updated when adding point/line/label or recalcBounds
-        self.gridLeft, self.gridTop = None, None  # derive first bounds on first draw
+        self.gridMinX, self.gridMinY = None, None  # derive first bounds on first draw
         self.gridWidth, self.gridHeight = None, None
 
         # bounding box of visible grid, in grid units
@@ -203,6 +194,7 @@ class GridCanvas(PixelCanvas):
         self.cursorGridWidth, self.cursorGridHeight = None, None
 
         self.zoomlevel = 1.0
+        self.needsRefresh = False
 
         # bounding box of gridCanvas, in pixels
         self.gridpoints = []  # list of (grid_x, grid_y, attr)
@@ -218,7 +210,7 @@ class GridCanvas(PixelCanvas):
 
     @property
     def statusLine(self):
-        gridstr = 'grid (%s,%s)-(%s,%s)' % (self.gridLeft, self.gridTop, self.gridRight, self.gridBottom)
+        gridstr = 'grid (%s,%s)-(%s,%s)' % (self.gridMinX, self.gridMinY, self.gridMaxX, self.gridMaxY)
         vgridstr = 'visibleGrid (%s,%s)-(%s,%s)' % (self.visibleGridLeft, self.visibleGridTop, self.visibleGridRight, self.visibleGridBottom)
         cursorstr = 'cursor (%s,%s)-(%s,%s)' % (self.cursorGridLeft, self.cursorGridTop, self.cursorGridRight, self.cursorGridBottom)
         return ' '.join((gridstr, vgridstr, cursorstr))
@@ -264,12 +256,12 @@ class GridCanvas(PixelCanvas):
         return self.visibleGridHeight*4/self.gridCanvasHeight
 
     @property
-    def gridRight(self):
-        return self.gridLeft + self.gridWidth
+    def gridMaxX(self):
+        return self.gridMinX + self.gridWidth
 
     @property
-    def gridBottom(self):
-        return self.gridTop + self.gridHeight
+    def gridMaxY(self):
+        return self.gridMinY + self.gridHeight
 
     @property
     def cursorGridRight(self):
@@ -297,29 +289,21 @@ class GridCanvas(PixelCanvas):
 
     @property
     def cursorPixelBounds(self):
+        if self.cursorGridWidth is None:
+            return [0,0,0,0]
         return [ self.scaleX(self.cursorGridLeft),
                  self.scaleY(self.cursorGridTop),
                  self.scaleX(self.cursorGridLeft+self.cursorGridWidth),
                  self.scaleY(self.cursorGridTop+self.cursorGridHeight)
         ]
 
-    def checkBounds(self, x, y):
-        if self.gridLeft is None or x < self.gridLeft:     self.gridLeft = x
-        if self.gridTop is None or y < self.gridTop:       self.gridTop = y
-        if self.gridWidth is None or x > self.gridRight:   self.gridWidth = x-self.gridLeft
-        if self.gridHeight is None or y > self.gridBottom: self.gridHeight = y-self.gridTop
-
     def point(self, x, y, colorname):
-        self.checkBounds(x, y)
         self.gridpoints.append((x, y, colors[colorname]))
 
     def line(self, x1, y1, x2, y2, colorname):
-        self.checkBounds(x1, y1)
-        self.checkBounds(x2, y2)
         self.gridlines.append((x1, y1, x2, y2, colors[colorname]))
 
     def label(self, x, y, text, colorname):
-        self.checkBounds(x, y)
         self.gridlabels.append((x, y, text, colors[colorname]))
 
     def zoom(self, amt=None):
@@ -343,24 +327,27 @@ class GridCanvas(PixelCanvas):
     def setZoom(self, zoomlevel=None):
         if zoomlevel:
             self.zoomlevel = zoomlevel
-        self.visibleGridWidth = self.gridWidth*self.zoomlevel
-        self.visibleGridHeight = self.gridHeight*self.zoomlevel
 
-    def setVisibleGrid(self, centerx=None, centery=None):
-        'set visibleGrid according to zoomlevel, centered on (centerx, centery)'
-        if centerx is None:
-            if self.cursorGridLeft is None:
-                centerx = self.cursorGridLeft + self.cursorGridWidth/2
-                centery = self.cursorGridTop + self.cursorGridHeight/2
-            else:
-                centerx = self.gridLeft + self.gridWidth/2
-                centery = self.gridTop + self.gridHeight/2
+        if not self.gridWidth or not self.gridHeight:
+            self.gridMinX = min(x for x, y, attr in self.gridpoints)
+            self.gridWidth = max(x for x, y, attr in self.gridpoints) - self.gridMinX
+            self.gridMinY = min(y for x, y, attr in self.gridpoints)
+            self.gridHeight = max(y for x, y, attr in self.gridpoints) - self.gridMinY
 
-        self.setZoom()
-        self.visibleGridLeft = centerx - self.visibleGridWidth/2
-        self.visibleGridTop = centery - self.visibleGridHeight/2
+        if not self.visibleGridWidth or not self.visibleGridHeight:
+            self.visibleGridWidth = self.gridWidth*self.zoomlevel
+            self.visibleGridHeight = self.gridHeight*self.zoomlevel
+            self.visibleGridLeft = self.gridMinX + self.gridWidth/2 - self.visibleGridWidth/2
+            self.visibleGridTop = self.gridMinY + self.gridHeight/2 - self.visibleGridHeight/2
+        else:
+            self.visibleGridWidth = self.gridWidth*self.zoomlevel
+            self.visibleGridHeight = self.gridHeight*self.zoomlevel
 
-        self.refresh()
+        if not self.cursorGridWidth or not self.cursorGridHeight:
+            self.cursorGridLeft = self.visibleGridLeft
+            self.cursorGridTop = self.visibleGridTop
+            self.cursorGridWidth = self.charGridWidth
+            self.cursorGridHeight = self.charGridHeight
 
     def checkCursor(self):
         'scroll to make cursor visible'
@@ -382,23 +369,29 @@ class GridCanvas(PixelCanvas):
         'canvas Y units to grid units'
         return (canvas_height)*self.visibleGridHeight/self.gridCanvasHeight
 
-    @async
     def refresh(self):
-        'plots points and lines and text onto the PixelCanvas'
-        self.resetCanvasDimensions()
+        self.needsRefresh = True
+
+    def plotAll(self):
+        self.needsRefresh = False
         self.pixels.clear()
         self.labels.clear()
+        self.resetCanvasDimensions()
+        for t in self.currentThreads:
+            if t.name == 'plotAll_async':
+                ctypeAsyncRaise(t, EscapeException)
+        self.plotAll_async()
 
-        if self.visibleGridLeft is None:
-            self.setVisibleGrid()
+    @async
+    def plotAll_async(self):
+        'plots points and lines and text onto the PixelCanvas'
 
-            self.cursorGridLeft = self.visibleGridLeft
-            self.cursorGridTop = self.visibleGridTop
-            self.cursorGridWidth = self.charGridWidth
-            self.cursorGridHeight = self.charGridHeight
+        self.setZoom()
 
         for x, y, attr in Progress(self.gridpoints):
-            self.plotpixel(self.scaleX(x), self.scaleY(y), attr)
+            if y >= self.visibleGridTop and y <= self.visibleGridBottom:
+                if x >= self.visibleGridLeft and x <= self.visibleGridRight:
+                    self.plotpixel(self.scaleX(x), self.scaleY(y), attr)
 
         for x1, y1, x2, y2, attr in Progress(self.gridlines):
             self.plotline(self.scaleX(x1), self.scaleY(y1), self.scaleX(x2), self.scaleY(y2), attr)

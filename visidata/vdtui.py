@@ -159,12 +159,12 @@ ESC='^['
 globalCommand('KEY_RESIZE', '')  # no-op by default
 globalCommand('q',  'vd.sheets.pop(0)', 'quit current sheet')
 
-globalCommand(['h', 'KEY_LEFT'],  'cursorRight(-1)', 'move one column left')
-globalCommand(['j', 'KEY_DOWN'],  'cursorDown(+1)', 'move one row down')
-globalCommand(['k', 'KEY_UP'],    'cursorDown(-1)', 'move one row up')
-globalCommand(['l', 'KEY_RIGHT'], 'cursorRight(+1)', 'move one column right')
-globalCommand(['^F', 'KEY_NPAGE', 'kDOWN'], 'cursorDown(nVisibleRows); sheet.topRowIndex += nVisibleRows', 'scroll one page forward')
-globalCommand(['^B', 'KEY_PPAGE', 'kUP'], 'cursorDown(-nVisibleRows); sheet.topRowIndex -= nVisibleRows', 'scroll one page backward')
+globalCommand('cursor-left',  'cursorRight(-1)', 'move one column left')
+globalCommand('cursor-down',  'cursorDown(+1)', 'move one row down')
+globalCommand('cursor-up',    'cursorDown(-1)', 'move one row up')
+globalCommand('cursor-right', 'cursorRight(+1)', 'move one column right')
+globalCommand('cursor-page-down', 'cursorDown(nVisibleRows); sheet.topRowIndex += nVisibleRows', 'scroll one page forward')
+globalCommand('cursor-page-up', 'cursorDown(-nVisibleRows); sheet.topRowIndex -= nVisibleRows', 'scroll one page backward')
 
 globalCommand('gq', 'vd.sheets.clear()', 'quit all sheets (clean exit)')
 
@@ -173,6 +173,12 @@ globalCommand('gk', 'sheet.cursorRowIndex = sheet.topRowIndex = 0', 'move all th
 globalCommand('gj', 'sheet.cursorRowIndex = len(rows); sheet.topRowIndex = cursorRowIndex-nVisibleRows', 'move all the way to the bottom')
 globalCommand('gl', 'sheet.leftVisibleColIndex = len(visibleCols)-1; pageLeft(); sheet.cursorVisibleColIndex = len(visibleCols)-1', 'move all the way to the right')
 
+globalCommand(['j', 'KEY_DOWN'],  'cursor-down')
+globalCommand(['k', 'KEY_UP'],    'cursor-up')
+globalCommand(['h', 'KEY_LEFT'],  'cursor-left')
+globalCommand(['l', 'KEY_RIGHT'], 'cursor-right')
+globalCommand(['^F', 'KEY_NPAGE', 'kDOWN'], 'cursor-page-down')
+globalCommand(['^B', 'KEY_PPAGE', 'kUP'], 'cursor-page-up')
 globalCommand('gg', 'gk')
 globalCommand('G', 'gj')
 globalCommand('KEY_HOME', 'gk')
@@ -211,7 +217,7 @@ globalCommand('z^E', 'vd.push(TextSheet("cell_error", getattr(cursorCell, "error
 
 globalCommand('^^', 'vd.sheets[0], vd.sheets[1] = vd.sheets[1], vd.sheets[0]', 'jump to previous sheet (swaps with current sheet)')
 
-globalCommand('g^E', 'vd.push(TextSheet("last_errors", sum(vd.lastErrors, [])))', 'view traceback for most recent errors')
+globalCommand('g^E', 'vd.push(TextSheet("last_errors", sum(vd.lastErrors[-10:], [])))', 'view traceback for most recent errors')
 
 globalCommand('^R', 'reload(); recalc(); status("reloaded")', 'reload current sheet')
 globalCommand('z^R', 'cursorCol._cachedValues.clear()', 'clear cache for current column')
@@ -1619,7 +1625,7 @@ class Column:
         except EscapeException:
             raise
         except Exception as e:
-            exceptionCaught(status=False)
+#            exceptionCaught(status=False)
             return self.type()
 
     def getValue(self, row):

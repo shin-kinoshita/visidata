@@ -1,6 +1,6 @@
 from visidata import *
 
-option('color_graph_axis', 'white', 'color for graph axis labels')
+option('color_graph_axis', 'bold', 'color for graph axis labels')
 
 globalCommand('m', 'vd.push(GraphSheet(sheet.name+"_graph", selectedRows or rows, keyCols and keyCols[0] or None, cursorCol))', 'graph the current column vs the first key column (or row number)')
 globalCommand('gm', 'vd.push(GraphSheet(sheet.name+"_graph", selectedRows or rows, keyCols and keyCols[0], *numericCols(nonKeyVisibleCols)))', 'graph all numeric columns vs the first key column (or row number)')
@@ -17,14 +17,18 @@ def numericCols(cols):
 class GraphSheet(GridCanvas):
     commands = GridCanvas.commands + [
         # swap directions of up/down
-        Command('j', 'sheet.cursorGridTop -= cursorGridHeight', ''),
-        Command('k', 'sheet.cursorGridTop += cursorGridHeight', ''),
+        Command('cursor-up', 'sheet.cursorGridTop += cursorGridHeight', ''),
+        Command('cursor-down', 'sheet.cursorGridTop -= cursorGridHeight', ''),
+
         Command('zj', 'sheet.cursorGridTop -= charGridHeight', ''),
         Command('zk', 'sheet.cursorGridTop += charGridHeight', ''),
+
         Command('J', 'sheet.cursorGridHeight -= cursorGridHeight', ''),
         Command('K', 'sheet.cursorGridHeight += cursorGridHeight', ''),
         Command('zJ', 'sheet.cursorGridHeight -= charGridHeight', ''),
         Command('zK', 'sheet.cursorGridHeight += charGridHeight', ''),
+
+        Command('zz', 'fixPoint(gridCanvasLeft, gridCanvasHeight, cursorGridLeft, cursorGridTop); sheet.visibleGridWidth=cursorGridWidth; sheet.visibleGridHeight=cursorGridHeight', 'set bounds to cursor'),
     ]
 
     def __init__(self, name, rows, xcol, *ycols, **kwargs):
@@ -37,7 +41,7 @@ class GraphSheet(GridCanvas):
             isNumeric(col) or error('%s type is non-numeric' % col.name)
 
     def legend(self, i, txt, colorname):
-        self.plotlabel(self.canvasRight-30, self.canvasTop+i*4, txt, colors[colorname])
+        self.plotlabel(self.canvasWidth-30, i*4, txt, colors[colorname])
 
     def scaleY(self, grid_y):
         'returns canvas y coordinate, with y-axis inverted'
@@ -76,18 +80,22 @@ class GraphSheet(GridCanvas):
                 except EscapeException:
                     raise
                 except Exception:
-                    exceptionCaught()
                     nerrors += 1
 
         status('plotted %d points (%d errors)' % (nplotted, nerrors))
 
+        self.setZoom(1.0)
         self.refresh()
+
+    def setZoom(self, zoomlevel=None):
+        super().setZoom(zoomlevel)
+        self.createLabels()
 
     def add_y_axis_label(self, frac):
         amt = self.visibleGridTop + frac*(self.visibleGridHeight)
-        if isinstance(self.gridTop, int):
+        if isinstance(self.gridMinY, int):
             txt = '%d' % amt
-        elif isinstance(self.gridTop, float):
+        elif isinstance(self.gridMinY, float):
             txt = '%.02f' % amt
         else:
             txt = str(frac)
@@ -107,12 +115,10 @@ class GraphSheet(GridCanvas):
         # plot x-axis labels below the gridCanvasBottom, but within the gridCanvas width-wise
         self.plotlabel(self.gridCanvasLeft+frac*self.gridCanvasWidth, self.gridCanvasBottom+4, txt, colors[options.color_graph_axis])
 
-    @async
-    def refresh(self):
-        super().refresh()
-        self.create_labels()
+    def plotAll(self):
+        super().plotAll()
 
-    def create_labels(self):
+    def createLabels(self):
         self.gridlabels = []
 
         # y-axis
@@ -129,9 +135,14 @@ class GraphSheet(GridCanvas):
         self.add_x_axis_label(0.25)
         self.add_x_axis_label(0.00)
 
+        # TODO: if 0 line is within visibleGrid, explicitly draw on the axis
+        # TODO: grid lines corresponding to axis labels
+
+
         xname = self.xcol.name if self.xcol else 'row#'
         self.plotlabel(0, self.gridCanvasBottom+4, '%*s»' % (int(self.leftMarginPixels/2-2), xname), colors[options.color_graph_axis])
 
         for i, ycol in enumerate(self.ycols):
             colorname = graphColors[i]
             self.legend(i, ycol.name, colorname)
+
