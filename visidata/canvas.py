@@ -33,7 +33,6 @@ class PixelCanvas(Sheet):
         super().__init__(name, *sources, **kwargs)
         self.pixels = defaultdict(lambda: defaultdict(Counter)) # [y][x] = { attr: count, ... }
         self.labels = []  # (x, y, text, attr)
-        self.rows = [1]  # something for cursorRowIndex
         self.resetCanvasDimensions()
 
     def resetCanvasDimensions(self):
@@ -169,13 +168,21 @@ class GridCanvas(PixelCanvas):
         Command('K', 'sheet.cursorGridHeight -= charGridHeight', ''),
 
         Command('Z', 'zoom()', 'zoom into cursor'),
-        Command('+', 'sheet.zoomlevel *= 1/1.2; resetVisibleGrid()', 'zoom in 20%'),
-        Command('-', 'sheet.zoomlevel *= 1.2; resetVisibleGrid()', 'zoom out 20%'),
-        Command('0', 'sheet.zoomlevel = 1.0; resetVisibleGrid()', 'zoom to fit full extent'),
+        Command('+', 'sheet.zoomlevel *= 1/1.2; setVisibleGrid()', 'zoom in 20%'),
+        Command('-', 'sheet.zoomlevel *= 1.2; setVisibleGrid()', 'zoom out 20%'),
+        Command('0', 'sheet.zoomlevel = 1.0; setVisibleGrid()', 'zoom to fit full extent'),
 
-        Command('BUTTON1_PRESSED', 'sheet.cursorGridLeft, sheet.cursorGridTop = gridMouse', ''),
+        # set cursor box with left click
+        Command('BUTTON1_PRESSED', 'sheet.cursorGridLeft, sheet.cursorGridTop = gridMouseX, gridMouseY', ''),
         Command('BUTTON1_CLICKED', 'BUTTON1_PRESSED', ''),
-        Command('BUTTON1_RELEASED', 'setCursorSize(*gridMouse)', ''),
+        Command('BUTTON1_RELEASED', 'setCursorSize(gridMouseX, gridMouseY)', ''),
+
+        # center on point with right click
+        Command('BUTTON3_CLICKED', 'fixPoint(canvasWidth/2, canvasHeight/2, gridMouseX, gridMouseY)', ''),
+
+        # zoom in/out with scroll wheel
+        Command('BUTTON4_PRESSED', 'tmp=gridMouseX,gridMouseY; setZoom(zoomlevel/1.2); fixPoint(canvasMouseX, canvasMouseY, *tmp)', ''),
+        Command('REPORT_MOUSE_POSITION', 'tmp=gridMouseX,gridMouseY; setZoom(zoomlevel*1.2); fixPoint(canvasMouseX, canvasMouseY, *tmp)', ''),
     ]
 
     def __init__(self, name, *sources, **kwargs):
@@ -210,10 +217,27 @@ class GridCanvas(PixelCanvas):
         self.gridCanvasHeight = self.canvasHeight - self.bottomMarginPixels - self.topMarginPixels
 
     @property
-    def gridMouse(self):
-        gridX = self.visibleGridLeft + (self.mouseX-self.gridCanvasLeft/2)*2*self.visibleGridWidth/self.gridCanvasWidth
-        gridY = self.visibleGridTop + (self.gridCanvasBottom/4-self.mouseY-1)*4*self.visibleGridHeight/self.gridCanvasHeight
-        return gridX, gridY
+    def statusLine(self):
+        gridstr = 'grid (%s,%s)-(%s,%s)' % (self.gridLeft, self.gridTop, self.gridRight, self.gridBottom)
+        vgridstr = 'visibleGrid (%s,%s)-(%s,%s)' % (self.visibleGridLeft, self.visibleGridTop, self.visibleGridRight, self.visibleGridBottom)
+        cursorstr = 'cursor (%s,%s)-(%s,%s)' % (self.cursorGridLeft, self.cursorGridTop, self.cursorGridRight, self.cursorGridBottom)
+        return ' '.join((gridstr, vgridstr, cursorstr))
+
+    @property
+    def canvasMouseX(self):
+        return self.mouseX*2
+
+    @property
+    def canvasMouseY(self):
+        return self.mouseY*4
+
+    @property
+    def gridMouseX(self):
+        return self.visibleGridLeft + (self.canvasMouseX-self.gridCanvasLeft)*self.visibleGridWidth/self.gridCanvasWidth
+
+    @property
+    def gridMouseY(self):
+        return self.visibleGridTop + (self.canvasMouseY-self.gridCanvasTop)*self.visibleGridHeight/self.gridCanvasHeight
 
     def setCursorSize(self, gridX, gridY):
         'sets width based on other side x and y'
@@ -246,6 +270,18 @@ class GridCanvas(PixelCanvas):
     @property
     def gridBottom(self):
         return self.gridTop + self.gridHeight
+
+    @property
+    def cursorGridRight(self):
+        return self.cursorGridLeft + self.cursorGridWidth
+
+    @property
+    def cursorGridBottom(self):
+        return self.cursorGridTop + self.cursorGridHeight
+
+    @property
+    def visibleGridRight(self):
+        return self.visibleGridLeft + self.visibleGridWidth
 
     @property
     def visibleGridBottom(self):
@@ -296,13 +332,31 @@ class GridCanvas(PixelCanvas):
             self.visibleGridWidth *= amt
             self.visibleGridHeight *= amt
 
-    def resetVisibleGrid(self):
-        # point to zoom in closer to
-        centerx = self.cursorGridLeft + self.cursorGridWidth/2
-        centery = self.cursorGridTop + self.cursorGridHeight/2
+    def fixPoint(self, canvas_x, canvas_y, grid_x, grid_y):
+        'adjust visibleGrid so that (grid_x, grid_y) is plotted at (canvas_x, canvas_y)'
+        self.visibleGridLeft = grid_x - self.gridW(canvas_x-self.gridCanvasLeft)
+        self.visibleGridTop = grid_y - self.gridH(self.gridCanvasBottom-canvas_y)
+        self.refresh()
+#        assert canvas_x == self.scaleX(grid_x), (canvas_x, self.scaleX(grid_x))
+#        assert canvas_y == self.scaleY(grid_y), (canvas_y, self.scaleY(grid_y))
 
+    def setZoom(self, zoomlevel=None):
+        if zoomlevel:
+            self.zoomlevel = zoomlevel
         self.visibleGridWidth = self.gridWidth*self.zoomlevel
         self.visibleGridHeight = self.gridHeight*self.zoomlevel
+
+    def setVisibleGrid(self, centerx=None, centery=None):
+        'set visibleGrid according to zoomlevel, centered on (centerx, centery)'
+        if centerx is None:
+            if self.cursorGridLeft is None:
+                centerx = self.cursorGridLeft + self.cursorGridWidth/2
+                centery = self.cursorGridTop + self.cursorGridHeight/2
+            else:
+                centerx = self.gridLeft + self.gridWidth/2
+                centery = self.gridTop + self.gridHeight/2
+
+        self.setZoom()
         self.visibleGridLeft = centerx - self.visibleGridWidth/2
         self.visibleGridTop = centery - self.visibleGridHeight/2
 
@@ -320,6 +374,14 @@ class GridCanvas(PixelCanvas):
         'returns canvas y coordinate'
         return round(self.gridCanvasTop+(y-self.visibleGridTop)*self.gridCanvasHeight/self.visibleGridHeight)
 
+    def gridW(self, canvas_width):
+        'canvas X units to grid units'
+        return (canvas_width)*self.visibleGridWidth/self.gridCanvasWidth
+
+    def gridH(self, canvas_height):
+        'canvas Y units to grid units'
+        return (canvas_height)*self.visibleGridHeight/self.gridCanvasHeight
+
     @async
     def refresh(self):
         'plots points and lines and text onto the PixelCanvas'
@@ -328,10 +390,7 @@ class GridCanvas(PixelCanvas):
         self.labels.clear()
 
         if self.visibleGridLeft is None:
-            self.visibleGridLeft = self.gridLeft
-            self.visibleGridWidth = self.gridWidth
-            self.visibleGridTop = self.gridTop
-            self.visibleGridHeight = self.gridHeight
+            self.setVisibleGrid()
 
             self.cursorGridLeft = self.visibleGridLeft
             self.cursorGridTop = self.visibleGridTop

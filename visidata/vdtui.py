@@ -2230,7 +2230,7 @@ def setupcolors(stdscr, f, *args):
     curses.raw()    # get control keys instead of signals
     curses.meta(1)  # allow "8-bit chars"
     curses.mousemask(-1) # even more than curses.ALL_MOUSE_EVENTS
-    curses.mouseinterval(50) # 50ms snappy but allows for double-click
+    curses.mouseinterval(0) # very snappy but does not allow for [multi]click
     curses.mouseEvents = {}
 
     for k in dir(curses):

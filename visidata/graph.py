@@ -42,7 +42,14 @@ class GraphSheet(GridCanvas):
     def scaleY(self, grid_y):
         'returns canvas y coordinate, with y-axis inverted'
         canvas_y = super().scaleY(grid_y)
-        return (self.gridCanvasBottom-canvas_y)
+        return (self.gridCanvasBottom-canvas_y+4)
+
+    def gridY(self, canvas_y):
+        return (self.gridCanvasBottom-canvas_y)*self.visibleGridHeight/self.gridCanvasHeight
+
+    @property
+    def gridMouseY(self):
+        return self.visibleGridTop + (self.gridCanvasBottom-self.canvasMouseY)*self.visibleGridHeight/self.gridCanvasHeight
 
     @property
     def cursorPixelBounds(self):
