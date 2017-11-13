@@ -2,8 +2,8 @@ from visidata import *
 
 option('color_graph_axis', 'bold', 'color for graph axis labels')
 
-globalCommand('m', 'vd.push(GraphSheet(sheet.name+"_graph", sheet, selectedRows or rows, keyCols and keyCols[0] or None, cursorCol))', 'graph the current column vs the first key column (or row number)')
-globalCommand('gm', 'vd.push(GraphSheet(sheet.name+"_graph", sheet, selectedRows or rows, keyCols and keyCols[0], *numericCols(nonKeyVisibleCols)))', 'graph all numeric columns vs the first key column (or row number)')
+globalCommand('m', 'vd.push(GraphSheet(sheet.name+"_graph", sheet, selectedRows or rows, keyCols, [cursorCol]))', 'graph the current column vs the first key column (or row number)')
+globalCommand('gm', 'vd.push(GraphSheet(sheet.name+"_graph", sheet, selectedRows or rows, keyCols, numericCols(nonKeyVisibleCols)))', 'graph all numeric columns vs the first key column (or row number)')
 
 
 def numericCols(cols):
@@ -28,18 +28,15 @@ class GraphSheet(GridCanvas):
         Command('zz', 'fixPoint(gridCanvasLeft, gridCanvasHeight, cursorGridLeft, cursorGridTop); sheet.visibleGridWidth=cursorGridWidth; sheet.visibleGridHeight=cursorGridHeight', 'set bounds to cursor'),
     ]
 
-    def __init__(self, name, sheet, rows, xcol, *ycols, **kwargs):
-        self.graphColors = [colors[colorname] for colorname in self.graphColornames]  # overridable
+    def __init__(self, name, sheet, rows, xcols, ycols, **kwargs):
+        self.graphColors = itertools.cycle([colors[colorname] for colorname in self.graphColornames])
         super().__init__(name, sheet, sourceRows=rows, **kwargs)
-        self.xcol = xcol
-        self.ycols = ycols
-        if xcol:
-            isNumeric(self.xcol) or error('%s type is non-numeric' % xcol.name)
-        for col in ycols:
-            isNumeric(col) or error('%s type is non-numeric' % col.name)
 
+        self.xcols = xcols
+        self.ycols = [ycol for ycol in ycols if isNumeric(ycol)] or error('%s is non-numeric' % '/'.join(yc.name for yc in ycols))
+        self.legends = {}  # txt: attr
 
-    def legend(self, i, txt, attr):
+    def plotlegend(self, i, txt, attr):
         self.plotlabel(self.canvasWidth-30, i*4, txt, attr)
 
     def scaleY(self, grid_y):
@@ -65,14 +62,26 @@ class GraphSheet(GridCanvas):
         nplotted = 0
 
         self.gridpoints.clear()
+        self.legends.clear()
 
         status('loading data points')
-        for i, ycol in enumerate(self.ycols):
-            attr = self.graphColors[i % len(self.graphColors)]
+        catcols = [c for c in self.xcols if not isNumeric(c)]
+        for ycol in self.ycols:
+            colattr = next(self.graphColors)
 
             for rownum, row in enumerate(Progress(self.sourceRows)):  # rows being plotted from source
                 try:
-                    graph_x = float(self.xcol.getTypedValue(row)) if self.xcol else rownum
+                    k = tuple(c.getValue(row) for c in catcols)
+                    if k:
+                        attr = self.legends.get(k, None)
+                        if attr is None:
+                            attr = next(self.graphColors)
+                            self.plotlegend(len(self.legends), '|'.join(k), attr) # improve loading experience
+                            self.legends[k] = attr
+                    else:
+                        attr = colattr
+
+                    graph_x = float(self.xcols[0].getTypedValue(row)) if self.xcols else rownum
                     graph_y = ycol.getTypedValue(row)
 
                     self.point(graph_x, graph_y, attr, row)
@@ -81,6 +90,9 @@ class GraphSheet(GridCanvas):
                     raise
                 except Exception:
                     nerrors += 1
+                    if options.debug:
+                        raise
+
 
         status('loaded %d points (%d errors)' % (nplotted, nerrors))
 
@@ -106,7 +118,7 @@ class GraphSheet(GridCanvas):
 
     def add_x_axis_label(self, frac):
         amt = self.visibleGridLeft + frac*self.visibleGridWidth
-        txt = self.xcol.format(self.xcol.type(amt))
+        txt = ','.join(xcol.format(xcol.type(amt)) for xcol in self.xcols if isNumeric(xcol))
 
         # plot x-axis labels below the gridCanvasBottom, but within the gridCanvas width-wise
         attr = colors[options.color_graph_axis]
@@ -135,10 +147,8 @@ class GraphSheet(GridCanvas):
         # TODO: if 0 line is within visibleGrid, explicitly draw on the axis
         # TODO: grid lines corresponding to axis labels
 
-
-        xname = self.xcol.name if self.xcol else 'row#'
+        xname = ','.join(xcol.name for xcol in self.xcols if isNumeric(xcol)) or 'row#'
         self.plotlabel(0, self.gridCanvasBottom+4, '%*s»' % (int(self.leftMarginPixels/2-2), xname), colors[options.color_graph_axis])
 
-        for i, ycol in enumerate(self.ycols):
-            self.legend(i, ycol.name, self.graphColors[i])
-
+        for i, (k, attr) in enumerate(self.legends.items()):
+            self.plotlegend(i, '|'.join(k), attr)
