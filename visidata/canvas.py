@@ -306,14 +306,14 @@ class GridCanvas(PixelCanvas):
                  self.scaleY(self.cursorGridTop+self.cursorGridHeight)
         ]
 
-    def point(self, x, y, colorname, row=None):
-        self.gridpoints.append((x, y, colors[colorname], row))
+    def point(self, x, y, attr, row=None):
+        self.gridpoints.append((x, y, attr, row))
 
-    def line(self, x1, y1, x2, y2, colorname, row=None):
-        self.gridlines.append((x1, y1, x2, y2, colors[colorname], row))
+    def line(self, x1, y1, x2, y2, attr, row=None):
+        self.gridlines.append((x1, y1, x2, y2, attr, row))
 
-    def label(self, x, y, text, colorname, row=None):
-        self.gridlabels.append((x, y, text, colors[colorname], row))
+    def label(self, x, y, text, attr, row=None):
+        self.gridlabels.append((x, y, text, attr, row))
 
     def fixPoint(self, canvas_x, canvas_y, grid_x, grid_y):
         'adjust visibleGrid so that (grid_x, grid_y) is plotted at (canvas_x, canvas_y)'
