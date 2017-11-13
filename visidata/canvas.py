@@ -31,7 +31,7 @@ class PixelCanvas(Sheet):
     ]
     def __init__(self, name, *sources, **kwargs):
         super().__init__(name, *sources, **kwargs)
-        self.pixels = defaultdict(lambda: defaultdict(Counter)) # [y][x] = { attr: count, ... }
+        self.pixels = defaultdict(lambda: defaultdict(lambda: defaultdict(list))) # [y][x] = { attr: list(rows), ... }
         self.labels = []  # (x, y, text, attr)
         self.resetCanvasDimensions()
 
@@ -42,10 +42,10 @@ class PixelCanvas(Sheet):
         self.canvasWidth = vd().windowWidth*2
         self.canvasHeight = (vd().windowHeight-1)*4  # exclude status line
 
-    def plotpixel(self, x, y, attr):
-        self.pixels[round(y)][round(x)][attr] += 1
+    def plotpixel(self, x, y, attr, row=None):
+        self.pixels[round(y)][round(x)][attr].append(row)
 
-    def plotline(self, x1, y1, x2, y2, attr):
+    def plotline(self, x1, y1, x2, y2, attr, row=None):
         'Draws onscreen segment of line from (x1, y1) to (x2, y2)'
         xdiff = max(x1, x2) - min(x1, x2)
         ydiff = max(y1, y2) - min(y1, y2)
@@ -62,7 +62,7 @@ class PixelCanvas(Sheet):
                 y += ydir * (i * ydiff) / r
                 x += xdir * (i * xdiff) / r
 
-            self.plotpixel(round(x), round(y), attr)
+            self.plotpixel(round(x), round(y), attr, row)
 
     def plotlabel(self, x, y, text, attr):
         self.labels.append((x, y, text, attr))
@@ -83,8 +83,15 @@ class PixelCanvas(Sheet):
         r = self.pixels[y].get(x, None)
         if not r:
             return 0
-        else:
-            return r.most_common(1)[0][0]
+        c = Counter({attr: len(rows) for attr, rows in r.items()})
+        return c.most_common(1)[0][0]
+
+    def getRowsInside(self, x1, y1, x2, y2):
+        for y in range(y1, y2):
+            for x in range(x1, x2):
+                for attr, rows in self.pixels[y].get(x, {}).items():
+                    for r in rows:
+                        yield r
 
     def draw(self, scr):
         scr.erase()
@@ -163,7 +170,6 @@ class GridCanvas(PixelCanvas):
 
         Command('zz', 'fixPoint(canvasGridLeft, canvasGridTop, cursorGridLeft, cursorGridTop); sheet.visibleGridWidth=cursorGridWidth; sheet.visibleGridHeight=cursorGridHeight', 'set bounds to cursor'),
 
-        Command('Z', 'zoom()', 'zoom into cursor'),
         Command('+', 'setZoom(zoomlevel / 1.2); refresh()', 'zoom in 20%'),
         Command('-', 'setZoom(zoomlevel * 1.2); refresh()', 'zoom out 20%'),
         Command('0', 'sheet.gridWidth = 0; sheet.visibleGridWidth = 0; setZoom(1.0); refresh()', 'zoom to fit full extent'),
@@ -174,6 +180,9 @@ class GridCanvas(PixelCanvas):
 
         Command('BUTTON4_PRESSED', 'tmp=(gridMouseX,gridMouseY); setZoom(zoomlevel/1.2); fixPoint(canvasMouseX, canvasMouseY, *tmp)', 'zoom in with scroll wheel'),
         Command('REPORT_MOUSE_POSITION', 'tmp=(gridMouseX,gridMouseY); setZoom(zoomlevel*1.2); fixPoint(canvasMouseX, canvasMouseY, *tmp)', 'zoom out with scroll wheel'),
+
+        Command('s', 'source.select(list(getRowsInside(*cursorPixelBounds)))', 'select all points within cursor box'),
+        Command('gs', 'source.select(list(getRowsInside(*visiblePixelBounds)))', 'select all points visible onscreen'),
     ]
 
     def __init__(self, name, *sources, **kwargs):
@@ -197,9 +206,9 @@ class GridCanvas(PixelCanvas):
         self.needsRefresh = False
 
         # bounding box of gridCanvas, in pixels
-        self.gridpoints = []  # list of (grid_x, grid_y, attr)
-        self.gridlines = []   # list of (grid_x1, grid_y1, grid_x2, grid_y2, attr)
-        self.gridlabels = []  # list of (grid_x, grid_y, label, attr)
+        self.gridpoints = []  # list of (grid_x, grid_y, attr, row)
+        self.gridlines = []   # list of (grid_x1, grid_y1, grid_x2, grid_y2, attr, row)
+        self.gridlabels = []  # list of (grid_x, grid_y, label, attr, row)
 
     def resetCanvasDimensions(self):
         super().resetCanvasDimensions()
@@ -234,15 +243,15 @@ class GridCanvas(PixelCanvas):
     def setCursorSize(self, gridX, gridY):
         'sets width based on other side x and y'
         if gridX > self.cursorGridLeft:
-            self.cursorGridWidth = gridX - self.cursorGridLeft
+            self.cursorGridWidth = max(gridX - self.cursorGridLeft, self.charGridWidth)
         else:
-            self.cursorGridWidth = self.cursorGridLeft - gridX
+            self.cursorGridWidth = max(self.cursorGridLeft - gridX, self.charGridWidth)
             self.cursorGridLeft = gridX
 
         if gridY > self.cursorGridTop:
-            self.cursorGridHeight = gridY - self.cursorGridTop
+            self.cursorGridHeight = max(gridY - self.cursorGridTop, self.charGridHeight)
         else:
-            self.cursorGridHeight = self.cursorGridTop - gridY
+            self.cursorGridHeight = max(self.cursorGridTop - gridY, self.charGridHeight)
             self.cursorGridTop = gridY
 
     @property
@@ -297,42 +306,30 @@ class GridCanvas(PixelCanvas):
                  self.scaleY(self.cursorGridTop+self.cursorGridHeight)
         ]
 
-    def point(self, x, y, colorname):
-        self.gridpoints.append((x, y, colors[colorname]))
+    def point(self, x, y, colorname, row=None):
+        self.gridpoints.append((x, y, colors[colorname], row))
 
-    def line(self, x1, y1, x2, y2, colorname):
-        self.gridlines.append((x1, y1, x2, y2, colors[colorname]))
+    def line(self, x1, y1, x2, y2, colorname, row=None):
+        self.gridlines.append((x1, y1, x2, y2, colors[colorname], row))
 
-    def label(self, x, y, text, colorname):
-        self.gridlabels.append((x, y, text, colors[colorname]))
-
-    def zoom(self, amt=None):
-        if amt is None:  # zoom to cursor
-            self.visibleGridLeft = self.cursorGridLeft
-            self.visibleGridTop = self.cursorGridTop
-            self.visibleGridWidth = self.cursorGridWidth
-            self.visibleGridHeight = self.cursorGridHeight
-        else:
-            self.visibleGridWidth *= amt
-            self.visibleGridHeight *= amt
+    def label(self, x, y, text, colorname, row=None):
+        self.gridlabels.append((x, y, text, colors[colorname], row))
 
     def fixPoint(self, canvas_x, canvas_y, grid_x, grid_y):
         'adjust visibleGrid so that (grid_x, grid_y) is plotted at (canvas_x, canvas_y)'
         self.visibleGridLeft = grid_x - self.gridW(canvas_x-self.gridCanvasLeft)
         self.visibleGridTop = grid_y - self.gridH(self.gridCanvasBottom-canvas_y)
         self.refresh()
-#        assert canvas_x == self.scaleX(grid_x), (canvas_x, self.scaleX(grid_x))
-#        assert canvas_y == self.scaleY(grid_y), (canvas_y, self.scaleY(grid_y))
 
     def setZoom(self, zoomlevel=None):
         if zoomlevel:
             self.zoomlevel = zoomlevel
 
         if not self.gridWidth or not self.gridHeight:
-            self.gridMinX = min(x for x, y, attr in self.gridpoints)
-            self.gridWidth = max(x for x, y, attr in self.gridpoints) - self.gridMinX
-            self.gridMinY = min(y for x, y, attr in self.gridpoints)
-            self.gridHeight = max(y for x, y, attr in self.gridpoints) - self.gridMinY
+            self.gridMinX = min(x for x, y, attr, row in self.gridpoints)
+            self.gridWidth = max(x for x, y, attr, row in self.gridpoints) - self.gridMinX
+            self.gridMinY = min(y for x, y, attr, row in self.gridpoints)
+            self.gridHeight = max(y for x, y, attr, row in self.gridpoints) - self.gridMinY
 
         if not self.visibleGridWidth or not self.visibleGridHeight:
             self.visibleGridWidth = self.gridWidth*self.zoomlevel
@@ -388,14 +385,14 @@ class GridCanvas(PixelCanvas):
 
         self.setZoom()
 
-        for x, y, attr in Progress(self.gridpoints):
+        for x, y, attr, row in Progress(self.gridpoints):
             if y >= self.visibleGridTop and y <= self.visibleGridBottom:
                 if x >= self.visibleGridLeft and x <= self.visibleGridRight:
-                    self.plotpixel(self.scaleX(x), self.scaleY(y), attr)
+                    self.plotpixel(self.scaleX(x), self.scaleY(y), attr, row)
 
-        for x1, y1, x2, y2, attr in Progress(self.gridlines):
-            self.plotline(self.scaleX(x1), self.scaleY(y1), self.scaleX(x2), self.scaleY(y2), attr)
+        for x1, y1, x2, y2, attr, row in Progress(self.gridlines):
+            self.plotline(self.scaleX(x1), self.scaleY(y1), self.scaleX(x2), self.scaleY(y2), attr, row)
 
-        for x, y, text, attr in Progress(self.gridlabels):
-            self.plotlabel(self.scaleX(x), self.scaleY(y), text, attr)
+        for x, y, text, attr, row in Progress(self.gridlabels):
+            self.plotlabel(self.scaleX(x), self.scaleY(y), text, attr, row)
 

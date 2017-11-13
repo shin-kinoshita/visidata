@@ -2,8 +2,8 @@ from visidata import *
 
 option('color_graph_axis', 'bold', 'color for graph axis labels')
 
-globalCommand('m', 'vd.push(GraphSheet(sheet.name+"_graph", selectedRows or rows, keyCols and keyCols[0] or None, cursorCol))', 'graph the current column vs the first key column (or row number)')
-globalCommand('gm', 'vd.push(GraphSheet(sheet.name+"_graph", selectedRows or rows, keyCols and keyCols[0], *numericCols(nonKeyVisibleCols)))', 'graph all numeric columns vs the first key column (or row number)')
+globalCommand('m', 'vd.push(GraphSheet(sheet.name+"_graph", sheet, selectedRows or rows, keyCols and keyCols[0] or None, cursorCol))', 'graph the current column vs the first key column (or row number)')
+globalCommand('gm', 'vd.push(GraphSheet(sheet.name+"_graph", sheet, selectedRows or rows, keyCols and keyCols[0], *numericCols(nonKeyVisibleCols)))', 'graph all numeric columns vs the first key column (or row number)')
 
 graphColors = 'green red yellow cyan magenta white 38 136 168'.split()
 
@@ -31,8 +31,8 @@ class GraphSheet(GridCanvas):
         Command('zz', 'fixPoint(gridCanvasLeft, gridCanvasHeight, cursorGridLeft, cursorGridTop); sheet.visibleGridWidth=cursorGridWidth; sheet.visibleGridHeight=cursorGridHeight', 'set bounds to cursor'),
     ]
 
-    def __init__(self, name, rows, xcol, *ycols, **kwargs):
-        super().__init__(name, rows, **kwargs)
+    def __init__(self, name, sheet, rows, xcol, *ycols, **kwargs):
+        super().__init__(name, sheet, sourceRows=rows, **kwargs)
         self.xcol = xcol
         self.ycols = ycols
         if xcol:
@@ -71,11 +71,11 @@ class GraphSheet(GridCanvas):
             colorname = graphColors[i % len(graphColors)]
             attr = colors[colorname]
 
-            for rownum, row in enumerate(Progress(self.source)):
+            for rownum, row in enumerate(Progress(self.sourceRows)):  # rows being plotted from source
                 try:
                     graph_x = self.xcol.getTypedValue(row) if self.xcol else rownum
                     graph_y = ycol.getTypedValue(row)
-                    self.point(graph_x, graph_y, colorname)
+                    self.point(graph_x, graph_y, colorname, row)
                     nplotted += 1
                 except EscapeException:
                     raise
