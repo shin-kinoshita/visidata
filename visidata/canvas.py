@@ -397,9 +397,11 @@ class GridCanvas(PixelCanvas):
 
         self.setZoom()
 
+        xmin, ymin = self.visibleGridLeft, self.visibleGridTop
+        xmax, ymax = self.visibleGridRight, self.visibleGridBottom
         for x, y, attr, row in Progress(self.gridpoints):
-            if y >= self.visibleGridTop and y <= self.visibleGridBottom:
-                if x >= self.visibleGridLeft and x <= self.visibleGridRight:
+            if ymin <= y and y <= ymax:
+                if xmin <= x and x <= xmax:
                     self.plotpixel(self.scaleX(x), self.scaleY(y), attr, row)
 
         for x1, y1, x2, y2, attr, row in Progress(self.gridlines):

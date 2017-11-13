@@ -22,10 +22,8 @@ class GraphSheet(GridCanvas):
         Command('zj', 'sheet.cursorGridTop -= charGridHeight', ''),
         Command('zk', 'sheet.cursorGridTop += charGridHeight', ''),
 
-        Command('J', 'sheet.cursorGridHeight -= cursorGridHeight', ''),
-        Command('K', 'sheet.cursorGridHeight += cursorGridHeight', ''),
-        Command('zJ', 'sheet.cursorGridHeight -= charGridHeight', ''),
-        Command('zK', 'sheet.cursorGridHeight += charGridHeight', ''),
+        Command('J', 'sheet.cursorGridHeight -= charGridHeight', ''),
+        Command('K', 'sheet.cursorGridHeight += charGridHeight', ''),
 
         Command('zz', 'fixPoint(gridCanvasLeft, gridCanvasHeight, cursorGridLeft, cursorGridTop); sheet.visibleGridWidth=cursorGridWidth; sheet.visibleGridHeight=cursorGridHeight', 'set bounds to cursor'),
     ]
@@ -68,6 +66,7 @@ class GraphSheet(GridCanvas):
 
         self.gridpoints.clear()
 
+        status('loading data points')
         for i, ycol in enumerate(self.ycols):
             attr = self.graphColors[i % len(self.graphColors)]
 
@@ -83,7 +82,7 @@ class GraphSheet(GridCanvas):
                 except Exception:
                     nerrors += 1
 
-        status('plotted %d points (%d errors)' % (nplotted, nerrors))
+        status('loaded %d points (%d errors)' % (nplotted, nerrors))
 
         self.setZoom(1.0)
         self.refresh()
