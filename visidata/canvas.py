@@ -182,7 +182,11 @@ class GridCanvas(PixelCanvas):
         Command('REPORT_MOUSE_POSITION', 'tmp=(gridMouseX,gridMouseY); setZoom(zoomlevel*1.2); fixPoint(canvasMouseX, canvasMouseY, *tmp)', 'zoom out with scroll wheel'),
 
         Command('s', 'source.select(list(getRowsInside(*cursorPixelBounds)))', 'select all points within cursor box'),
+        Command('t', 'source.unselect(list(getRowsInside(*cursorPixelBounds)))', 'toggle selection of all points within cursor box'),
+        Command('u', 'source.unselect(list(getRowsInside(*cursorPixelBounds)))', 'unselect all points within cursor box'),
         Command('gs', 'source.select(list(getRowsInside(*visiblePixelBounds)))', 'select all points visible onscreen'),
+        Command('gt', 'source.unselect(list(getRowsInside(*visiblePixelBounds)))', 'toggle selection of all points visible onscreen'),
+        Command('gu', 'source.unselect(list(getRowsInside(*visiblePixelBounds)))', 'unselect all points visible onscreen'),
     ]
 
     def __init__(self, name, *sources, **kwargs):
@@ -295,6 +299,14 @@ class GridCanvas(PixelCanvas):
     @property
     def gridCanvasRight(self):
         return self.gridCanvasLeft + self.gridCanvasWidth
+
+    @property
+    def visiblePixelBounds(self):
+        return [ self.scaleX(self.visibleGridLeft),
+                 self.scaleY(self.visibleGridTop),
+                 self.scaleX(self.visibleGridLeft+self.visibleGridWidth),
+                 self.scaleY(self.visibleGridTop+self.visibleGridHeight)
+        ]
 
     @property
     def cursorPixelBounds(self):
